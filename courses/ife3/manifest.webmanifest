@@ -1,0 +1,14 @@
+{
+  "name": "IFE Level 3 Revision",
+  "short_name": "IFE L3",
+  "description": "Adaptive revision tools for the Level 3 passive fire protection course.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f1ec",
+  "theme_color": "#c8451b",
+  "icons": [
+    { "src": "brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

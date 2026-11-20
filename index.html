@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Courses</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="engine/styles.css">
+</head>
+<body>
+<main id="app">
+  <header class="top home"><h1>Courses</h1></header>
+  <p class="lead">Choose a course. Each one opens as its own app: add it to your Home Screen from its own page.</p>
+  <div id="list"></div>
+  <p class="copy">&copy; 2026 Ripley Foster, XRF Systems. All rights reserved.</p>
+</main>
+<noscript>This page needs JavaScript switched on.</noscript>
+<script src="courses.js"></script>
+<script>
+/* Reads each course's course.js in turn and lists it. Nothing else to maintain here. */
+(function () {
+  var list = document.getElementById('list'), ids = self.COURSE_LIST || [];
+  function next(k) {
+    if (k >= ids.length) { if (!list.children.length) list.textContent = 'No courses yet.'; return; }
+    var id = ids[k], s = document.createElement('script');
+    s.src = 'courses/' + id + '/course.js';
+    s.onload = function () {
+      var c = self.COURSE; self.COURSE = null;
+      if (c && c.listed !== false) {
+        var a = document.createElement('a'); a.className = 'modcard'; a.href = 'courses/' + id + '/';
+        a.style.textDecoration = 'none'; a.style.color = 'inherit';
+        var t = document.createElement('strong'); t.textContent = c.name;
+        var p = document.createElement('span'); p.textContent = c.tagline || '';
+        a.appendChild(t); a.appendChild(p); list.appendChild(a);
+      }
+      next(k + 1);
+    };
+    s.onerror = function () { next(k + 1); };
+    document.body.appendChild(s);
+  }
+  next(0);
+})();
+</script>
+</body>
+</html>

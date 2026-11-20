@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Course check</title>
+<style>body{font:15px/1.5 -apple-system,Segoe UI,sans-serif;max-width:720px;margin:0 auto;padding:16px}.ok{color:#1f7a4d}.no{color:#b3261e}li{margin:4px 0}</style>
+</head>
+<body>
+<h1>Course check</h1>
+<p>Open as <code>tools/check.html?c=ife3</code>. Checks one course's setup before release. Nothing is changed.</p>
+<ul id="out"></ul>
+<script>
+/* Setup check for course authors: manifest matches course.js, every file loads, revision mixes add up,
+   unit indexes exist, fills have 3 wrong options, every unit appears in a revision day, module ids are unique. */
+(function () {
+  var id = new URLSearchParams(location.search).get('c'), out = document.getElementById('out'), base = '../courses/' + id + '/';
+  function say(ok, msg) { var li = document.createElement('li'); li.className = ok ? 'ok' : 'no'; li.textContent = (ok ? '✓ ' : '✗ ') + msg; out.appendChild(li); }
+  if (!id) { say(false, 'Add ?c=<course id> to the address.'); return; }
+  function load(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(src); }; document.body.appendChild(s); }); }
+  function head(src) { return fetch(src, { method: 'GET', cache: 'no-store' }).then(function (r) { if (!r.ok) throw src; }); }
+  load(base + 'course.js').then(function () {
+    var C = self.COURSE; say(true, 'course.js loaded: ' + C.name + ' v' + C.version);
+    if (!/^[a-z0-9]+$/.test(C.id)) say(false, 'id should be lowercase letters and digits only'); else if (C.id !== id) say(false, 'id in course.js (' + C.id + ') differs from the folder name (' + id + ')'); else say(true, 'id matches folder');
+    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : []);
+    var assets = ['index.html', 'sw.js', 'brand/icon-180.png', 'brand/icon-192.png', 'brand/icon-512.png'].concat(C.brand && C.brand.logo ? [C.brand.logo] : [], C.brand && C.brand.bg ? [C.brand.bg] : []);
+    var checks = assets.map(function (f) { return head(base + f).then(function () { say(true, f + ' found'); }, function () { say(false, f + ' missing'); }); });
+    checks.push(fetch(base + 'manifest.webmanifest', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (m) {
+      say(m.name === C.name, 'manifest name ' + (m.name === C.name ? 'matches' : '"' + m.name + '" differs from course.js "' + C.name + '"'));
+      say(m.short_name === C.shortName, 'manifest short_name ' + (m.short_name === C.shortName ? 'matches' : 'differs'));
+      var tc = C.theme && C.theme.themeColor; say(m.theme_color === tc, 'manifest theme_color ' + (m.theme_color === tc ? 'matches' : 'differs'));
+    }, function () { say(false, 'manifest.webmanifest missing or not valid JSON'); }));
+    return Promise.all(checks).then(function () { return files.reduce(function (p, f) { return p.then(function () { return load(base + f); }); }, Promise.resolve()); }).then(function () {
+      say(true, files.length + ' content files loaded');
+      var MODS = self.COURSE_MODULES || [], RV = self.COURSE_REVISION, seen = {};
+      MODS.forEach(function (m) {
+        if (seen[m.id]) say(false, 'module id ' + m.id + ' used twice'); seen[m.id] = true;
+        var n = m.units.length, bad = [];
+        (m.cards || []).forEach(function (c, i) { if (!(c[0] >= 0 && c[0] < n)) bad.push('c' + i); });
+        (m.fills || []).forEach(function (f, i) { if (!(f[0] >= 0 && f[0] < n)) bad.push('f' + i); if (!f[3] || f[3].length !== 3) say(false, m.id + '.f' + i + ' needs exactly 3 wrong options'); });
+        ['questions', 'matches', 'diagrams'].forEach(function (k, z) { (m[k] || []).forEach(function (x, i) { if (!(x.u >= 0 && x.u < n)) bad.push('qpd'[z] + i); }); });
+        say(!bad.length, m.id + ': ' + (bad.length ? 'unit index out of range in ' + bad.join(', ') : 'all unit indexes valid'));
+      });
+      if (RV) {
+        function sum(o) { var t = 0, k; for (k in o) t += o[k]; return t; }
+        say(sum(RV.paperMix) === RV.paperLength, 'paperMix adds up to ' + sum(RV.paperMix) + ' (paperLength ' + RV.paperLength + ')');
+        say(sum(RV.mockMix) === RV.mockLength, 'mockMix adds up to ' + sum(RV.mockMix) + ' (mockLength ' + RV.mockLength + ')');
+        var cov = {}; RV.days.forEach(function (d) { d.units.forEach(function (p) { cov[p[0] + '.' + p[1]] = true; }); });
+        var miss = []; MODS.forEach(function (m) { m.units.forEach(function (u, i) { if (!cov[m.id + '.' + i]) miss.push(m.id + ' unit ' + i); }); });
+        say(!miss.length, miss.length ? 'not in any revision day: ' + miss.join(', ') : 'every unit is in a revision day');
+        say(RV.days.some(function (d) { return d.mock; }), RV.days.length + ' revision days; mock day ' + (RV.days.some(function (d) { return d.mock; }) ? 'set' : 'not set (no full mock)'));
+      }
+    });
+  }).catch(function (e) { say(false, 'could not load ' + e); });
+})();
+</script>
+</body>
+</html>
