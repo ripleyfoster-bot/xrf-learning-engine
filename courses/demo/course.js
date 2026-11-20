@@ -1,12 +1,11 @@
 /* Demo course: a tiny dummy course that proves the engine runs a second course.
    1 module, 3 items, no revision countdown. Not real training content. */
 self.COURSE = {
-  id: 'demo',
+  id: 'demo',                   // progress kept under 'xrf.demo.progress.v1'
   version: '0.1.0',
   name: 'Engine Demo Course',
   shortName: 'Demo',
   tagline: 'A dummy course for testing the learning engine',
-  storageKey: 'demo.progress.v1',
   listed: true,
 
   passMark: 0.7,

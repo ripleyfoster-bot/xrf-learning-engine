@@ -4,7 +4,8 @@
   'use strict';
   var CFG = window.COURSE;
   var MODS = window.COURSE_MODULES || [];
-  var KEY = CFG.storageKey;
+  // progress key made from the course id: unique per course, and apart from other apps on the same address
+  var KEY = 'xrf.' + CFG.id + '.progress.v1';
   var TXT = CFG.text || {}, LBL = CFG.labels || {};
   var NUMWORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen'];
   var app = document.getElementById('app');

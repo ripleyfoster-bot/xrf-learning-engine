@@ -22,7 +22,7 @@
   function head(src) { return fetch(src, { method: 'GET', cache: 'no-store' }).then(function (r) { if (!r.ok) throw src; }); }
   load(base + 'course.js').then(function () {
     var C = self.COURSE; say(true, 'course.js loaded: ' + C.name + ' v' + C.version);
-    if (!/^[a-z0-9]+$/.test(C.id)) say(false, 'id should be lowercase letters and digits only'); else if (C.id !== id) say(false, 'id in course.js (' + C.id + ') differs from the folder name (' + id + ')'); else say(true, 'id matches folder');
+    if (!/^[a-z0-9]{2,20}$/.test(C.id)) say(false, 'id should be 2 to 20 lowercase letters and digits only'); else if (C.id !== id) say(false, 'id in course.js (' + C.id + ') differs from the folder name (' + id + ')'); else say(true, 'id matches folder; progress key: xrf.' + C.id + '.progress.v1');
     var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : []);
     var assets = ['index.html', 'sw.js', 'brand/icon-180.png', 'brand/icon-192.png', 'brand/icon-512.png'].concat(C.brand && C.brand.logo ? [C.brand.logo] : [], C.brand && C.brand.bg ? [C.brand.bg] : []);
     var checks = assets.map(function (f) { return head(base + f).then(function () { say(true, f + ' found'); }, function () { say(false, f + ' missing'); }); });

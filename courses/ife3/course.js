@@ -1,14 +1,14 @@
 /* IFE Level 3 Revision: course settings.
    Everything specific to this course lives in this folder. The engine (../../engine/) is shared.
    Uses self, not window, so the offline cache (sw.js) can read it too.
-   NEVER change id, storageKey or module ids once the course is live: saved progress depends on them. */
+   NEVER change id or module ids once the course is live: saved progress depends on them. */
 self.COURSE = {
-  id: 'ife3',
+  id: 'ife3',                   // lowercase letters and digits only, same as the folder name.
+                                // Saved progress is kept under 'xrf.ife3.progress.v1' (made from this id).
   version: '0.11.0',            // course version: bump on any change in this folder
   name: 'IFE Level 3 Revision',
   shortName: 'IFE L3',
   tagline: 'A revision companion for the ASFP Level 3 course',
-  storageKey: 'ife3.progress.v1', // must stay exactly this, or IFE users lose their progress
   listed: true,                 // shown on the course list page
 
   passMark: 0.85,
