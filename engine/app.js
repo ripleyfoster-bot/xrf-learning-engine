@@ -1340,7 +1340,15 @@
 
   /* ---------- start ---------- */
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
-    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    // A new course or engine version means a new sw.js address, so every browser installs the update.
+    var hadWorker = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      // the new version has taken over: reload once so the screen shows it (not on first install)
+      if (hadWorker && !reloaded) { reloaded = true; location.reload(); }
+    });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js?v=' + encodeURIComponent(CFG.version + '-' + window.ENGINE_VERSION), { updateViaCache: 'none' }).catch(function () {});
+    });
   }
   if (MODS.length) cover(); else show(h('p', { class: 'lead' }, 'No module content found.'));
 })();

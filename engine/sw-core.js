@@ -30,7 +30,20 @@ self.addEventListener('activate', function (e) {
 });
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
-  // look only in this course's cache: other courses cache the same engine files at other versions.
+  var path = new URL(e.request.url).pathname;
+  // The page and the two version files come from the network when online (cache when offline),
+  // so the page always sees the newest version numbers and registers the matching sw.js?v=...
+  if (e.request.mode === 'navigate' || /\/course\.js$|\/engine\/version\.js$/.test(path)) {
+    var req = e.request.mode === 'navigate' ? e.request : new Request(e.request.url, { cache: 'no-cache' });
+    e.respondWith(fetch(req).then(function (r) {
+      if (r.ok) { var copy = r.clone(); caches.open(CACHE).then(function (c) { c.put(e.request, copy); }); }
+      return r;
+    }).catch(function () {
+      return caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }); });
+    }));
+    return;
+  }
+  // everything else: look only in this course's cache: other courses cache the same engine files at other versions.
   // A miss is fetched and stored, so offline use recovers if another app on this address cleared the cache.
   e.respondWith(caches.open(CACHE).then(function (c) {
     return c.match(e.request, { ignoreSearch: true }).then(function (hit) {

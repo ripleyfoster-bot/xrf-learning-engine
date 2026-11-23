@@ -3,7 +3,7 @@
 One engine, many courses. Built from the IFE Level 3 Revision app (v0.10.2).
 Plain HTML and JavaScript, no build tools. Runs on GitHub Pages.
 
-| Version | Engine 1.2.0 · IFE course 0.12.0 · Demo course 0.2.0 |
+| Version | Engine 1.3.0 · IFE course 0.12.0 · Demo course 0.2.0 |
 | --- | --- |
 
 ## Layout
@@ -41,7 +41,8 @@ Each course has its own address (`.../courses/ife3/`) and installs to the Home S
 
 - Change in a course folder: bump `version` in that course's `course.js`.
 - Change in `engine/`: bump `ENGINE_VERSION` in `engine/version.js`.
-- Either one changes the cache name, so phones fetch the new files. No file list to edit.
+- Either one changes the cache name and the sw.js address (sw.js?v=<course>-<engine>), so phones install the new files and reload once. No file list to edit.
+- Engine 1.3.0 fixed updates on iPhone: before it, a phone that had a course never picked up a new version.
 - Content: add only at the END of each list. Never change a module `id` or the course `id` once live.
 
 ## Saved progress
