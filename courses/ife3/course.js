@@ -5,11 +5,12 @@
 self.COURSE = {
   id: 'ife3',                   // lowercase letters and digits only, same as the folder name.
                                 // Saved progress is kept under 'xrf.ife3.progress.v1' (made from this id).
-  version: '0.11.0',            // course version: bump on any change in this folder
+  version: '0.12.0',            // course version: bump on any change in this folder
   name: 'IFE Level 3 Revision',
   shortName: 'IFE L3',
   tagline: 'A revision companion for the ASFP Level 3 course',
   listed: true,                 // shown on the course list page
+  importFrom: ['ife3'],         // also accept save files from the original IFE app (same item ids)
 
   passMark: 0.85,
   examLength: 40,

@@ -3,7 +3,7 @@
 One engine, many courses. Built from the IFE Level 3 Revision app (v0.10.2).
 Plain HTML and JavaScript, no build tools. Runs on GitHub Pages.
 
-| Version | Engine 1.1.0 · IFE course 0.11.0 · Demo course 0.2.0 |
+| Version | Engine 1.2.0 · IFE course 0.12.0 · Demo course 0.2.0 |
 | --- | --- |
 
 ## Layout
@@ -48,7 +48,9 @@ Each course has its own address (`.../courses/ife3/`) and installs to the Home S
 
 Progress is kept in the browser under `xrf.<course id>.progress.v1`, made automatically from the course id. Folder names are unique, so keys are too.
 All apps on `ripleyfoster-bot.github.io` share one storage area; the `xrf.` prefix keeps engine courses apart from them.
-The engine's IFE course does not share progress with the original IFE app (`ife3.progress.v1`): it starts fresh.
+The engine's IFE course does not share storage with the original IFE app (`ife3.progress.v1`). To move across, use Save my progress in the original app and Import a save here (`importFrom` in course.js).
+
+Save and import (engine 1.2.0): About screen. The file holds everything in the course's storage (progress, exam history, name, exam date, voice), tagged `xrf.<course id>`. Import replaces this device's data after a confirm.
 Offline caches are named `xrf-<id>-v<course>-e<engine>` so they do not clash with other apps on the same address.
 
 A GitHub Pages address is public to anyone who has the link. Do not share it beyond people entitled to the course material until an access gate is in place.

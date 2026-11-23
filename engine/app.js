@@ -319,12 +319,52 @@
         })() : null,
         SAY.ok ? (function () { var tb = btn('🔊 Test the voice', '', function () { say('Read aloud is working. This is the voice the app will use for questions.', tb); }); return tb; })() : null,
         h('p', null, SAY.ok ? 'Read aloud: tap the speaker at the top of any question or result to hear it, and tap again to stop. It uses this device\'s own voice' + (SAY.voice ? ' (' + SAY.voice.name + ')' : '') + ' and works offline.' : 'Read aloud: this browser has no built-in voice, so the speaker button is hidden.')),
+      backupPanel(),
       h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Course material and disclaimer'), notices()),
       h('p', { class: 'copy' }, COPY),
       btn('Reset all progress', 'bad', function () {
         // keeps the user's details and agreement; erases learning progress only
         if (window.confirm('Erase all progress on this device?')) { S = { v: 1, items: {}, exams: {}, user: S.user }; save(); home(); }
       }));
+  }
+
+  /* ---------- save and import: one file holding progress, exam history and settings ---------- */
+  // File shape: { app: 'xrf.<course id>', saved, version, engine, data: S }. Import replaces everything on this device.
+  // course.js importFrom: ['<app tag>'] also accepts saves from an older app whose item ids match this course.
+  function backupPanel() {
+    var tag = 'xrf.' + CFG.id, from = [tag].concat(CFG.importFrom || []);
+    var msg = h('p', { class: 'hint gap', role: 'status' });
+    var file = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
+    file.addEventListener('change', function () {
+      var f = file.files && file.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        var d; try { d = JSON.parse(r.result); } catch (e) { msg.textContent = 'That file could not be read. Choose a file saved from this app.'; file.value = ''; return; }
+        if (!d || from.indexOf(d.app) < 0 || !d.data || d.data.v !== 1) { msg.textContent = 'That is not a save file from ' + CFG.name + '.'; file.value = ''; return; }
+        var who = d.data.user && d.data.user.name ? d.data.user.name + '\'s ' : '';
+        if (!window.confirm('Replace everything on this device with ' + who + 'save from ' + String(d.saved || '').slice(0, 10).split('-').reverse().join('/') + '? Progress on this device will be overwritten.')) { file.value = ''; return; }
+        S = d.data; if (!S.items) S.items = {}; if (!S.exams) S.exams = {}; save(); pickVoice();
+        window.alert('Imported. Your progress and settings are now on this device.'); home();
+      };
+      r.readAsText(f);
+    });
+    function saveFile() {
+      var name = (CFG.shortName || CFG.id).replace(/[^A-Za-z0-9]+/g, '-') + '-save-' + new Date().toISOString().slice(0, 10) + '.json';
+      var blob = new Blob([JSON.stringify({ app: tag, saved: new Date().toISOString(), version: CFG.version, engine: window.ENGINE_VERSION, data: S }, null, 1)], { type: 'application/json' });
+      var asFile = null; try { asFile = new File([blob], name, { type: 'application/json' }); } catch (e) {}
+      // iPhone: the share sheet lets you Save to Files, AirDrop or email it. Elsewhere: a normal download.
+      if (asFile && navigator.canShare && navigator.canShare({ files: [asFile] })) {
+        navigator.share({ files: [asFile], title: name }).then(function () { msg.textContent = 'Saved: ' + name; }, function () {});
+        return;
+      }
+      var a = h('a', { href: URL.createObjectURL(blob), download: name }); document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      msg.textContent = 'Saved to your downloads: ' + name;
+    }
+    return h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Save and import'),
+      h('p', null, 'Save a file with your progress, exam scores and settings. Import it on another device, or after reinstalling, to carry on where you left off.'),
+      h('div', { class: 'qnav' }, btn('Save my progress', 'primary', saveFile), btn('Import a save', '', function () { file.click(); })),
+      file, msg);
   }
 
   /* ---------- brand mark: the course logo from brand/ (course.js brand.logo) ---------- */
