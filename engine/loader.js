@@ -24,6 +24,7 @@
   // content files then the app, run in this order
   var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; });
   if (C.revision) files.push('content/revision.js');
+  (C.reader || []).forEach(function (r) { files.push('content/' + r + '.js'); }); // reader chapters (engine 1.1.0)
   files.push(engine + 'app.js');
   files.forEach(function (f) { var s = document.createElement('script'); s.src = f; s.async = false; document.body.appendChild(s); });
 })();

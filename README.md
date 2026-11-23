@@ -3,7 +3,7 @@
 One engine, many courses. Built from the IFE Level 3 Revision app (v0.10.2).
 Plain HTML and JavaScript, no build tools. Runs on GitHub Pages.
 
-| Version | Engine 1.0.0 · IFE course 0.11.0 · Demo course 0.1.0 |
+| Version | Engine 1.1.0 · IFE course 0.11.0 · Demo course 0.2.0 |
 | --- | --- |
 
 ## Layout
@@ -12,7 +12,7 @@ Plain HTML and JavaScript, no build tools. Runs on GitHub Pages.
 index.html            front page: lists the courses in courses.js
 courses.js            course ids, in the order shown
 engine/               the same for every course: never put course wording here
-  app.js              screens, question types, papers, scoring, read-aloud
+  app.js              screens, question types, papers, scoring, read-aloud, reader
   styles.css          look (colours are defaults: each course overrides them)
   loader.js           reads course.js, sets name and colours, loads content then app.js
   sw-core.js          offline cache, built from course.js
@@ -21,7 +21,7 @@ courses/<id>/
   index.html  sw.js   identical in every course: copy them unchanged
   course.js           all settings and wording for this course
   manifest.webmanifest  name, short name and theme colour (must match course.js)
-  content/            module1.js ... and optional revision.js
+  content/            module1.js ... optional revision.js, optional reader chapters (reader1.js ... and pictures in content/reader/)
   brand/              logo.svg, bg.svg (optional), icon-180.png, icon-192.png, icon-512.png
 tools/check.html      setup check: tools/check.html?c=<id>
 ```
@@ -54,3 +54,10 @@ Offline caches are named `xrf-<id>-v<course>-e<engine>` so they do not clash wit
 A GitHub Pages address is public to anyone who has the link. Do not share it beyond people entitled to the course material until an access gate is in place.
 
 © 2026 Ripley Foster, XRF Systems. All rights reserved.
+
+## Reader (engine 1.1.0)
+
+A course can include its source material as chapters to read on screen or have read aloud.
+List the chapter files in `course.js` as `reader: ['reader1']`, put them in `content/`, and pictures in `content/reader/`.
+Every picture needs a written description (`desc`): read aloud uses it. Format: Content Pack Spec v0.3, section 6.
+The full text is public to anyone with the link: only your own material until the access lock exists.

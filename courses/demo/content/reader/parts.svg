@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 200" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <rect width="340" height="200" fill="#ffffff"/>
+  <rect x="20" y="20" width="300" height="50" rx="8" fill="#11706b"/>
+  <text x="170" y="50" fill="#ffffff" text-anchor="middle" font-weight="bold">engine/ (shared by every course)</text>
+  <rect x="20" y="120" width="140" height="56" rx="8" fill="#dff3e7" stroke="#1f7a4d"/>
+  <text x="90" y="145" text-anchor="middle" font-weight="bold" fill="#16242a">courses/ife3/</text>
+  <text x="90" y="163" text-anchor="middle" fill="#566a70">IFE course</text>
+  <rect x="180" y="120" width="140" height="56" rx="8" fill="#dff3e7" stroke="#1f7a4d"/>
+  <text x="250" y="145" text-anchor="middle" font-weight="bold" fill="#16242a">courses/demo/</text>
+  <text x="250" y="163" text-anchor="middle" fill="#566a70">Demo course</text>
+  <line x1="90" y1="70" x2="90" y2="120" stroke="#16242a" stroke-width="2"/>
+  <line x1="250" y1="70" x2="250" y2="120" stroke="#16242a" stroke-width="2"/>
+  <text x="170" y="100" text-anchor="middle" fill="#16242a">each course uses the same engine</text>
+</svg>

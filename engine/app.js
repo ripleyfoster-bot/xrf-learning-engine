@@ -53,6 +53,7 @@
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function show() {
     sayStop();
+    window.onscroll = null; app.classList.remove('reading');
     app.innerHTML = ''; for (var i = 0; i < arguments.length; i++) add(app, arguments[i]);
     var top = app.querySelector('header.top');
     if (top && SAY.ok && app.querySelector('.task, .rev, .hero.res')) top.appendChild(sayBtn());
@@ -288,6 +289,7 @@
       return h('button', { class: 'modcard', type: 'button', onclick: function () { unitFilter = -1; modScreen(m); } },
         h('strong', null, m.title), h('span', null, m.subtitle), bar(st.mastery), h('small', null, pct(st.mastery) + ' mastered'));
     });
+    var rdc = rdHomeCard(); if (rdc) list.unshift(rdc);
     if (RV) {
       var rs = rvState(), dn = rvDayNow();
       list.push(h('button', { class: 'modcard rvcard', type: 'button', onclick: rvHome },
@@ -1086,6 +1088,215 @@
       }),
       btn(mock ? 'Sit another mock' : 'Sit this day again', 'primary', function () { rvStart(day, mock); }), btn('Back to countdown', '', rvHome));
   }
+
+  /* ---------- reader (engine 1.1.0) ----------
+     The course's source material as chapters: text that reflows, with pictures, diagrams, charts and tables.
+     Read aloud goes block by block and highlights the block it is on; at a picture it reads the written
+     description. Descriptions are written when the course is built and checked by the subject expert:
+     nothing is generated on the device. Turned on per course with reader: ['reader1', ...] in course.js. */
+  var RD = window.COURSE_READER || null;
+  var RSIZE = [0.9, 1, 1.15, 1.3, 1.5], RRATE = [0.8, 1, 1.2, 1.4];
+  var RLOCK = null; // screen wake lock while reading aloud, where the device allows it
+  function rdState() {
+    var r = S.reader = S.reader || {};
+    r.pos = r.pos || {}; if (r.size == null) r.size = 1; if (r.rate == null) r.rate = 1;
+    return r;
+  }
+  function rdChapters() { return RD && RD.chapters ? RD.chapters : []; }
+  function rdFrac(ch) {
+    var p = rdState().pos[ch.id]; if (!p) return 0;
+    return p.done ? 1 : Math.min(1, (p.b + 1) / Math.max(1, ch.blocks.length));
+  }
+  function rdHomeCard() {
+    var chs = rdChapters(); if (!chs.length) return null;
+    var tot = 0; chs.forEach(function (c) { tot += rdFrac(c); });
+    var started = chs.some(function (c) { return rdState().pos[c.id]; });
+    return h('button', { class: 'modcard rdcard', type: 'button', onclick: rdContents },
+      h('strong', null, RD.title || 'Course material'), h('span', null, RD.subtitle || 'Read the source material, or have it read to you'),
+      bar(tot / chs.length), h('small', null, started ? pct(tot / chs.length) + ' read' : 'Not started'));
+  }
+  function rdContents() {
+    var chs = rdChapters(), r = rdState(), last = r.last && chs.filter(function (c) { return c.id === r.last; })[0];
+    show(topbar(RD.title || 'Course material', home),
+      last && !(r.pos[last.id] || {}).done ? btn('Carry on reading: ' + last.title, 'primary', function () { rdChapter(chs.indexOf(last)); }) : null,
+      h('h2', null, 'Contents'),
+      chs.map(function (c, k) {
+        var f = rdFrac(c), p = r.pos[c.id];
+        return h('button', { class: 'modcard', type: 'button', onclick: function () { rdChapter(k); } },
+          h('strong', null, c.title), c.source ? h('span', null, c.source) : null,
+          bar(f), h('small', null, !p ? 'Not started' : p.done ? 'Read' : pct(f) + ' read'));
+      }),
+      RD.note ? h('p', { class: 'copy' }, RD.note) : null);
+  }
+  // the words read aloud for one block (also what a screen reader user would want)
+  function rdSpeech(b) {
+    if (Array.isArray(b)) {
+      var t = b[0], v = b[1];
+      if (t === 'ul' || t === 'ol') return v.map(function (x, k) { return sayEnd((t === 'ol' ? (k + 1) + '. ' : '') + x); }).join(' ');
+      if (t === 'note') return sayEnd('Note: ' + v);
+      return sayEnd(v);
+    }
+    var lead = rdWord(b); lead = lead.charAt(0).toUpperCase() + lead.slice(1);
+    var out = sayEnd(lead + (b.cap ? ': ' + b.cap : ''));
+    if (b.desc) out += sayEnd('Description: ' + b.desc);
+    else if (b.fig === 'table') out += (b.rows || []).map(function (row, k) {
+      return sayEnd('Row ' + (k + 1) + ': ' + row.map(function (cell, j) { return (b.head && b.head[j] ? b.head[j] + ', ' : '') + cell; }).join('; '));
+    }).join(' ');
+    return out;
+  }
+  function rdWord(b) { return { table: 'table', chart: 'chart', diagram: 'diagram' }[b.fig] || 'picture'; }
+  function rdFigure(b, onDescribe) {
+    var media;
+    if (b.fig === 'table') {
+      media = h('div', { class: 'rtablewrap' }, h('table', { class: 'rtable' },
+        b.head ? h('thead', null, h('tr', null, b.head.map(function (x) { return h('th', { scope: 'col' }, x); }))) : null,
+        h('tbody', null, (b.rows || []).map(function (row) { return h('tr', null, row.map(function (x) { return h('td', null, x); })); }))));
+    } else if (b.svg) {
+      media = h('div', { class: 'rmedia', role: 'img', 'aria-label': b.alt || b.cap || 'Figure', html: b.svg });
+    } else {
+      media = h('img', { class: 'rmedia', src: b.src, alt: b.alt || b.cap || '', loading: 'lazy' });
+    }
+    var desc = b.desc ? h('div', { class: 'rdesc', hidden: true }, h('b', null, 'Description'), h('p', null, b.desc)) : null;
+    var dbtn = b.desc ? h('button', { class: 'btn link rdbtn', type: 'button', 'aria-expanded': 'false', onclick: function () {
+      var open = desc.hidden; desc.hidden = !open; dbtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      dbtn.textContent = open ? 'Hide description' : '🔊 Describe this ' + rdWord(b);
+      if (open) onDescribe(b);
+    } }, '🔊 Describe this ' + rdWord(b)) : null;
+    if (b.fig !== 'table') media.addEventListener('click', function () { rdZoom(b); });
+    return h('figure', { class: 'rfig' }, media, b.cap ? h('figcaption', null, b.cap) : null, dbtn, desc);
+  }
+  // full-screen view of one picture: pinch to zoom, description underneath
+  function rdZoom(b) {
+    var ov = h('div', { class: 'rzoom', role: 'dialog', 'aria-label': b.cap || 'Picture' },
+      h('button', { class: 'back rzx', type: 'button', 'aria-label': 'Close', onclick: function () { ov.remove(); } }, '×'),
+      b.svg ? h('div', { class: 'rzmedia', html: b.svg }) : h('img', { class: 'rzmedia', src: b.src, alt: b.alt || b.cap || '' }),
+      b.cap ? h('p', { class: 'rzcap' }, b.cap) : null, b.desc ? h('p', { class: 'rzdesc' }, b.desc) : null);
+    document.body.appendChild(ov);
+  }
+  function rdWake(on) {
+    try {
+      if (on && !RLOCK && navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { RLOCK = l; }, function () {});
+      if (!on && RLOCK) { RLOCK.release(); RLOCK = null; }
+    } catch (e) {}
+  }
+  function rdChapter(k) {
+    var chs = rdChapters(), ch = chs[k], r = rdState(), els = [];
+    r.last = ch.id; save();
+    function setPos(b, done) { var p = r.pos[ch.id] = r.pos[ch.id] || { b: 0 }; p.b = b; if (done) p.done = true; save(); }
+    var playBtn, sizeBtns, rateBtn, cur = null;
+    var text = h('article', { class: 'rtext', lang: 'en-GB', style: '--rsize:' + RSIZE[r.size] }, h('h1', { class: 'rtitle' }, ch.title),
+      ch.source ? h('p', { class: 'rsrc' }, ch.source) : null,
+      ch.blocks.map(function (b, i) {
+        var el;
+        if (Array.isArray(b)) {
+          var t = b[0], v = b[1];
+          if (t === 'h') el = h('h2', { class: 'rh' }, v);
+          else if (t === 'ul' || t === 'ol') el = h(t, { class: 'rlist' }, v.map(function (x) { return h('li', null, x); }));
+          else if (t === 'note') el = h('aside', { class: 'rnote' }, v);
+          else el = h('p', null, v);
+        } else el = rdFigure(b, function (fb) { readFrom(i, true); });
+        el.setAttribute('data-b', i); els.push(el); return el;
+      }),
+      h('p', { class: 'rend' }, 'End of ' + ch.title + '.'));
+    function lit(i) {
+      els.forEach(function (e) { e.classList.remove('rdon'); });
+      if (i < 0) return;
+      els[i].classList.add('rdon');
+      try { els[i].scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { els[i].scrollIntoView(); }
+    }
+    // read block by block from block i; only = just that one block (a picture's Describe button)
+    function readFrom(i, only) {
+      if (!SAY.ok) return;
+      var me = only ? null : playBtn;
+      var wasMine = me && SAY.on && SAY.btn === me;
+      sayStop(); sayNote('');
+      if (wasMine) { lit(-1); rdWake(false); return; }
+      var tok = SAY.tok, ss = window.speechSynthesis, started = false;
+      SAY.on = true; SAY.btn = me; sayMark(me, true); rdWake(true);
+      function done(end) {
+        if (tok !== SAY.tok) return;
+        SAY.on = false; sayMark(SAY.btn, false); SAY.btn = null; lit(-1); rdWake(false);
+        if (end && !only) setPos(ch.blocks.length - 1, true);
+      }
+      function block(b) {
+        if (tok !== SAY.tok) return;
+        if (b >= ch.blocks.length || (only && b > i)) return done(true);
+        if (!only) { setPos(b); cur = b; }
+        var fig = els[b].querySelector('.rdesc'); if (fig && fig.hidden) { var db = els[b].querySelector('.rdbtn'); fig.hidden = false; if (db) { db.textContent = 'Hide description'; db.setAttribute('aria-expanded', 'true'); } }
+        lit(b);
+        var parts = saySplit(sayClean(rdSpeech(ch.blocks[b])));
+        (function next(k, useVoice) {
+          if (tok !== SAY.tok) return;
+          if (k >= parts.length) return block(b + 1);
+          var u = new window.SpeechSynthesisUtterance(parts[k]);
+          u.lang = 'en-GB'; u.rate = RRATE[r.rate]; u.pitch = 1; u.volume = 1;
+          if (useVoice && SAY.voice) u.voice = SAY.voice;
+          u.onstart = function () { started = true; };
+          u.onend = function () { if (tok === SAY.tok) next(k + 1, useVoice); };
+          u.onerror = function (e) {
+            if (tok !== SAY.tok) return;
+            var why = e && e.error;
+            if (why === 'interrupted' || why === 'canceled') return done(false);
+            if (!started && useVoice && SAY.voice) return next(k, false);
+            done(false); sayNote('Read aloud stopped (' + (why || 'unknown error') + '). Tap Read aloud to carry on from here.');
+          };
+          ss.speak(u);
+          if (ss.paused) ss.resume();
+        })(0, true);
+      }
+      try { block(i); } catch (e) { done(false); sayNote('Read aloud could not start: ' + e.message); return; }
+      setTimeout(function () {
+        if (tok === SAY.tok && !started) sayNote('No sound yet? On iPhone and iPad, read aloud is silent when the phone is on Silent: turn Silent off, turn the volume up and tap Read aloud again.');
+      }, 2500);
+    }
+    // first block showing below the top bar: where "Read aloud" starts and where the place is kept
+    function firstVisible() {
+      var top = (app.querySelector('header.top') || { getBoundingClientRect: function () { return { bottom: 0 }; } }).getBoundingClientRect().bottom;
+      for (var i = 0; i < els.length; i++) if (els[i].getBoundingClientRect().bottom > top + 8) return i;
+      return els.length - 1;
+    }
+    // after a stop, carry on from the block that was being read if it is still on screen
+    function startAt() {
+      var f = firstVisible();
+      if (cur != null && cur >= f && els[cur].getBoundingClientRect().top < window.innerHeight) return cur;
+      return f;
+    }
+    playBtn = h('button', { class: 'btn primary rplay', type: 'button', 'aria-pressed': 'false', onclick: function () { readFrom(startAt()); } }, '▶ Read aloud');
+    function resize(d) {
+      r.size = Math.max(0, Math.min(RSIZE.length - 1, r.size + d)); save();
+      text.style.setProperty('--rsize', RSIZE[r.size]);
+      sizeBtns[0].disabled = r.size === 0; sizeBtns[1].disabled = r.size === RSIZE.length - 1;
+    }
+    sizeBtns = [h('button', { class: 'rtool', type: 'button', 'aria-label': 'Smaller text', onclick: function () { resize(-1); } }, 'A−'),
+      h('button', { class: 'rtool big', type: 'button', 'aria-label': 'Larger text', onclick: function () { resize(1); } }, 'A+')];
+    rateBtn = h('button', { class: 'rtool', type: 'button', 'aria-label': 'Reading speed', onclick: function () {
+      r.rate = (r.rate + 1) % RRATE.length; save(); rateBtn.textContent = RRATE[r.rate] + '×';
+      if (SAY.on && SAY.btn === playBtn) { readFrom(cur); readFrom(cur); } // stop, then start the same block at the new speed
+    } }, RRATE[r.rate] + '×');
+    var prev = h('button', { class: 'rtool', type: 'button', 'aria-label': 'Previous chapter', disabled: k === 0, onclick: function () { rdChapter(k - 1); } }, '‹');
+    var nxt = h('button', { class: 'rtool', type: 'button', 'aria-label': 'Next chapter', disabled: k === chs.length - 1, onclick: function () { setPos(ch.blocks.length - 1, true); rdChapter(k + 1); } }, '›');
+    var dock = h('div', { class: 'rdock' }, prev, sizeBtns[0], sizeBtns[1], SAY.ok ? playBtn : h('span', { class: 'rplay off' }, 'Read aloud not available'), rateBtn, nxt);
+    if (!SAY.ok) rateBtn.hidden = true;
+    show(topbar(ch.title, rdLeave(rdContents), (k + 1) + ' / ' + chs.length), text, dock);
+    app.classList.add('reading');
+    sizeBtns[0].disabled = r.size === 0; sizeBtns[1].disabled = r.size === RSIZE.length - 1;
+    // back to where the learner left off
+    var p = r.pos[ch.id];
+    if (p && p.b > 0 && !p.done && els[p.b]) setTimeout(function () { var y = els[p.b].getBoundingClientRect().top + window.pageYOffset - 80; window.scrollTo(0, y); }, 60);
+    // a chapter short enough to fit on one screen counts as read once opened
+    setTimeout(function () { if (app.contains(text) && document.body.scrollHeight <= window.innerHeight + 40) setPos(ch.blocks.length - 1, true); }, 300);
+    var tm = null;
+    window.onscroll = function () {
+      if (tm || SAY.on) return;
+      tm = setTimeout(function () {
+        tm = null; if (!app.contains(text)) return;
+        var b = firstVisible(), q = r.pos[ch.id];
+        if (!q || !q.done || b > 0) setPos(b, (window.innerHeight + window.pageYOffset) >= document.body.scrollHeight - 40);
+      }, 400);
+    };
+  }
+  // leaving the reader: stop scroll tracking, wake lock and the reading layout
+  function rdLeave(to) { return function () { window.onscroll = null; rdWake(false); app.classList.remove('reading'); to(); }; }
 
   /* ---------- start ---------- */
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {

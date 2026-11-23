@@ -1,8 +1,8 @@
 /* Demo course: a tiny dummy course that proves the engine runs a second course.
-   1 module, 3 items, no revision countdown. Not real training content. */
+   1 module, 3 items, no revision countdown, 2 reader chapters. Not real training content. */
 self.COURSE = {
   id: 'demo',                   // progress kept under 'xrf.demo.progress.v1'
-  version: '0.1.0',
+  version: '0.2.0',
   name: 'Engine Demo Course',
   shortName: 'Demo',
   tagline: 'A dummy course for testing the learning engine',
@@ -14,6 +14,7 @@ self.COURSE = {
 
   modules: ['module1'],
   revision: false,
+  reader: ['reader1'],          // reader chapters in content/ (engine 1.1.0)
 
   owner: { name: 'XRF Systems', url: 'https://example.com', label: 'example.com' },
   notices: [

@@ -13,7 +13,8 @@
 <ul id="out"></ul>
 <script>
 /* Setup check for course authors: manifest matches course.js, every file loads, revision mixes add up,
-   unit indexes exist, fills have 3 wrong options, every unit appears in a revision day, module ids are unique. */
+   unit indexes exist, fills have 3 wrong options, every unit appears in a revision day, module ids are unique,
+   reader chapters load and every picture has a description and alt text (engine 1.1.0). */
 (function () {
   var id = new URLSearchParams(location.search).get('c'), out = document.getElementById('out'), base = '../courses/' + id + '/';
   function say(ok, msg) { var li = document.createElement('li'); li.className = ok ? 'ok' : 'no'; li.textContent = (ok ? '✓ ' : '✗ ') + msg; out.appendChild(li); }
@@ -23,7 +24,7 @@
   load(base + 'course.js').then(function () {
     var C = self.COURSE; say(true, 'course.js loaded: ' + C.name + ' v' + C.version);
     if (!/^[a-z0-9]{2,20}$/.test(C.id)) say(false, 'id should be 2 to 20 lowercase letters and digits only'); else if (C.id !== id) say(false, 'id in course.js (' + C.id + ') differs from the folder name (' + id + ')'); else say(true, 'id matches folder; progress key: xrf.' + C.id + '.progress.v1');
-    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : []);
+    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : [], (C.reader || []).map(function (r) { return 'content/' + r + '.js'; }));
     var assets = ['index.html', 'sw.js', 'brand/icon-180.png', 'brand/icon-192.png', 'brand/icon-512.png'].concat(C.brand && C.brand.logo ? [C.brand.logo] : [], C.brand && C.brand.bg ? [C.brand.bg] : []);
     var checks = assets.map(function (f) { return head(base + f).then(function () { say(true, f + ' found'); }, function () { say(false, f + ' missing'); }); });
     checks.push(fetch(base + 'manifest.webmanifest', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (m) {
@@ -42,6 +43,34 @@
         ['questions', 'matches', 'diagrams'].forEach(function (k, z) { (m[k] || []).forEach(function (x, i) { if (!(x.u >= 0 && x.u < n)) bad.push('qpd'[z] + i); }); });
         say(!bad.length, m.id + ': ' + (bad.length ? 'unit index out of range in ' + bad.join(', ') : 'all unit indexes valid'));
       });
+      var RD = self.COURSE_READER;
+      if (C.reader && C.reader.length) {
+        if (!RD || !RD.chapters || !RD.chapters.length) say(false, 'reader is set in course.js but no chapters loaded (files must start self.COURSE_READER)');
+        else {
+          var rseen = {}, figs = 0, nodesc = [], noalt = [], badb = [], pics = [];
+          RD.chapters.forEach(function (ch, ci) {
+            if (!/^[a-z0-9]{1,20}$/.test(ch.id || '')) say(false, 'reader chapter ' + ci + ' needs an id of lowercase letters and digits');
+            if (rseen[ch.id]) say(false, 'reader chapter id ' + ch.id + ' used twice'); rseen[ch.id] = true;
+            (ch.blocks || []).forEach(function (b, bi) {
+              var at = ch.id + ' block ' + bi;
+              if (Array.isArray(b)) { if (['h', 'p', 'ul', 'ol', 'note'].indexOf(b[0]) < 0) badb.push(at); return; }
+              if (!b || ['img', 'chart', 'diagram', 'table'].indexOf(b.fig) < 0) { badb.push(at); return; }
+              figs++;
+              if (b.fig !== 'table' && !b.desc) nodesc.push(at);
+              if (b.fig !== 'table' && !b.alt) noalt.push(at);
+              if (b.fig !== 'table' && !b.src && !b.svg) badb.push(at + ' (needs src or svg)');
+              if (b.src) pics.push(b.src);
+            });
+          });
+          say(true, RD.chapters.length + ' reader chapters, ' + figs + ' pictures and tables');
+          say(!badb.length, badb.length ? 'reader blocks not understood: ' + badb.join(', ') : 'every reader block is a known type');
+          say(!nodesc.length, nodesc.length ? 'pictures with no description (read aloud needs one): ' + nodesc.join(', ') : 'every picture has a description');
+          say(!noalt.length, noalt.length ? 'pictures with no short alt text: ' + noalt.join(', ') : 'every picture has alt text');
+          return Promise.all(pics.map(function (f) { return head(base + f).then(function () { say(true, f + ' found'); }, function () { say(false, f + ' missing'); }); })).then(rvChecks);
+        }
+      }
+      rvChecks();
+      function rvChecks() {
       if (RV) {
         function sum(o) { var t = 0, k; for (k in o) t += o[k]; return t; }
         say(sum(RV.paperMix) === RV.paperLength, 'paperMix adds up to ' + sum(RV.paperMix) + ' (paperLength ' + RV.paperLength + ')');
@@ -50,6 +79,7 @@
         var miss = []; MODS.forEach(function (m) { m.units.forEach(function (u, i) { if (!cov[m.id + '.' + i]) miss.push(m.id + ' unit ' + i); }); });
         say(!miss.length, miss.length ? 'not in any revision day: ' + miss.join(', ') : 'every unit is in a revision day');
         say(RV.days.some(function (d) { return d.mock; }), RV.days.length + ' revision days; mock day ' + (RV.days.some(function (d) { return d.mock; }) ? 'set' : 'not set (no full mock)'));
+      }
       }
     });
   }).catch(function (e) { say(false, 'could not load ' + e); });

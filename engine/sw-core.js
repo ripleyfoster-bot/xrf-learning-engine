@@ -4,10 +4,18 @@ var C = self.COURSE;
 // prefix 'xrf-' keeps these apart from other apps on the same github.io address (e.g. the old IFE app's 'ife3-v0.10.2')
 var PREFIX = 'xrf-' + C.id + '-';
 var CACHE = PREFIX + 'v' + C.version + '-e' + self.ENGINE_VERSION;
+// reader chapters (engine 1.1.0): load them here too, so every picture they use is cached for offline reading
+var READER = (C.reader || []).map(function (r) { return 'content/' + r + '.js'; });
+if (READER.length) importScripts.apply(self, READER);
+var RFILES = [];
+(self.COURSE_READER && self.COURSE_READER.chapters || []).forEach(function (ch) {
+  (ch.blocks || []).forEach(function (b) { if (b && b.src && RFILES.indexOf(b.src) < 0) RFILES.push(b.src); });
+});
 var FILES = ['./', 'index.html', 'course.js', 'manifest.webmanifest', 'brand/icon-180.png', 'brand/icon-192.png', 'brand/icon-512.png',
   '../../engine/version.js', '../../engine/loader.js', '../../engine/app.js', '../../engine/styles.css']
   .concat((C.modules || []).map(function (m) { return 'content/' + m + '.js'; }))
   .concat(C.revision ? ['content/revision.js'] : [])
+  .concat(READER).concat(RFILES)
   .concat(C.brand && C.brand.logo ? [C.brand.logo] : [])
   .concat(C.brand && C.brand.bg ? [C.brand.bg] : []);
 
