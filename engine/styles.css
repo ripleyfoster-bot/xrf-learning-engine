@@ -275,3 +275,37 @@ html::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 .rzmedia svg { display: block; width: 100%; height: auto; }
 .rzcap { color: var(--mute); font-size: .9rem; } .rzdesc { line-height: 1.6; }
 @media (min-width: 1100px) { #app.reading { zoom: 1; } }
+
+/* read the unit / read the module (engine 1.5.0): module reading notes on one scrolling page */
+.tile.read { min-height: 0; }
+/* lots of text scrolls under the bars here, so both are solid */
+#app:has(.rdstick) .top { background: var(--bg); }
+.rdstick { position: sticky; z-index: 4; margin: 0 -16px 12px; padding: 4px 16px 2px; background: var(--bg); }
+.rdnow { display: flex; align-items: center; gap: 12px; padding: 2px 0 8px; }
+.rdwhere { flex: 1; min-width: 0; }
+.rdwhere span { display: block; font-weight: 600; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rdwhere small { display: block; color: var(--mute); font-size: 0.8rem; }
+.rdnow .btn { width: auto; margin: 0; min-height: 42px; padding: 8px 16px; white-space: nowrap; }
+.bar.rdprog { margin: 0 0 8px; }
+.reader.rtext { padding-bottom: 4px; }
+.rdunit { padding: 4px 0 18px; }
+.rdunit + .rdunit { border-top: 1px solid var(--line); padding-top: 20px; }
+.rdh { font-size: 1.3em; line-height: 1.3; margin: 4px 0 12px; }
+.reader h4.rh { margin: 1.2em 0 0.4em; }
+.reader li, .reader h3, .reader h4, .reader p, .reader aside { border-radius: 6px; transition: background-color .25s, box-shadow .25s; }
+.rdend { margin-top: 12px; }
+@media (min-width: 900px) { .rdstick { margin: 0 -28px 12px; padding: 4px 28px 2px; } }
+
+/* resume dialogue (engine 1.5.0): attached to the page body, not #app */
+.rdmodal { position: fixed; inset: 0; z-index: 30; background: rgba(10, 12, 16, .55); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+.rdbox { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; padding: 18px; width: 100%; max-width: 460px; max-height: 85vh; overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.rdbox h3 { margin: 0 0 6px; font-size: 1.15rem; }
+.rdbox > p { margin: 0 0 8px; color: var(--mute); }
+.rdpick { display: block; width: 100%; text-align: left; margin-top: 8px; padding: 12px 14px; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.rdpick strong { display: block; }
+.rdpick small { color: var(--mute); }
+.rdpick.last { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (min-width: 600px) { .rdmodal { align-items: center; } }
+/* zoomed like the app panel on big screens; height limit divided by the zoom so it still fits the window */
+@media (min-width: 1100px) { .rdbox { zoom: 1.2; max-height: 70vh; } }
+@media (min-width: 1600px) { .rdbox { zoom: 1.35; max-height: 62vh; } }

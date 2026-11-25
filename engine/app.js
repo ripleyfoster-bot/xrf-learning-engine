@@ -51,8 +51,10 @@
   }
   function btn(label, cls, fn) { return h('button', { class: 'btn ' + (cls || ''), type: 'button', onclick: fn }, label); }
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  var LEAVE = null; // clean-up for the screen being left (engine 1.5.0: the module reader's dialogue, wake lock and saved place)
   function show() {
     sayStop();
+    if (LEAVE) { var lv = LEAVE; LEAVE = null; lv(); }
     window.onscroll = null; app.classList.remove('reading');
     app.innerHTML = ''; for (var i = 0; i < arguments.length; i++) add(app, arguments[i]);
     var top = app.querySelector('header.top');
@@ -83,9 +85,13 @@
     return (window.speechSynthesis.getVoices() || []).filter(function (v) { return voiceScore(v) > 0; })
       .sort(function (a, b) { return voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name); });
   }
+  // engine 1.5.0: '*default' names no voice, so the device uses its own default for British English
+  // (on iPhone, possibly the voice ticked in Settings > Accessibility > Spoken Content > Voices)
+  var DEFAULT_VOICE = '*default';
   function pickVoice() {
     if (!SAY.ok) return;
     var vs = voiceList(), want = S.voice || '';
+    if (want === DEFAULT_VOICE) { SAY.voice = null; return; }
     SAY.voice = vs.filter(function (v) { return v.name === want; })[0] || vs[0] || null;
   }
   if (SAY.ok) {
@@ -312,13 +318,19 @@
           pickVoice();
           var vs = voiceList();
           if (!vs.length) return h('p', { class: 'hint' }, 'No English voices found yet. Close and reopen the app, then look here again.');
-          var sl = h('select', { class: 'tsel wide', 'aria-label': 'Read-aloud voice' }, vs.map(function (v) { return h('option', { value: v.name }, v.name + (/en[-_]GB/i.test(v.lang) ? ' (British)' : ' (' + v.lang + ')')); }));
-          sl.value = SAY.voice ? SAY.voice.name : '';
-          sl.addEventListener('change', function () { S.voice = sl.value; save(); pickVoice(); say('This is ' + sl.value + '. I will read your questions in this voice.', null); });
-          return h('div', { class: 'gap' }, h('p', null, h('b', null, 'Read-aloud voice'), ' (best first; your choice is saved on this device)'), sl);
+          var sl = h('select', { class: 'tsel wide', 'aria-label': 'Read-aloud voice' },
+            [h('option', { value: DEFAULT_VOICE }, 'Device default (British English)')].concat(vs.map(function (v) { return h('option', { value: v.name }, v.name + (/en[-_]GB/i.test(v.lang) ? ' (British)' : ' (' + v.lang + ')')); })));
+          sl.value = S.voice === DEFAULT_VOICE ? DEFAULT_VOICE : SAY.voice ? SAY.voice.name : '';
+          sl.addEventListener('change', function () {
+            S.voice = sl.value; save(); pickVoice();
+            say(sl.value === DEFAULT_VOICE ? 'This is the device default voice. I will read your questions in this voice.' : 'This is ' + sl.value + '. I will read your questions in this voice.', null);
+          });
+          return h('div', { class: 'gap' }, h('p', null, h('b', null, 'Read-aloud voice'), ' (best first; your choice is saved on this device)'), sl,
+            h('p', { class: 'hint' }, 'English voices this device offers the app: ' + vs.length + '. Device default lets the device pick; on iPhone it may use the voice ticked in Settings, Accessibility, Spoken Content, Voices, English (UK).'),
+            h('p', { class: 'hint' }, 'On iPhone, Personal Voice and Siri voices are not offered to web apps, downloaded voices may not be passed through (it depends on the iOS version), and locking the phone stops read aloud.'));
         })() : null,
         SAY.ok ? (function () { var tb = btn('🔊 Test the voice', '', function () { say('Read aloud is working. This is the voice the app will use for questions.', tb); }); return tb; })() : null,
-        h('p', null, SAY.ok ? 'Read aloud: tap the speaker at the top of any question or result to hear it, and tap again to stop. It uses this device\'s own voice' + (SAY.voice ? ' (' + SAY.voice.name + ')' : '') + ' and works offline.' : 'Read aloud: this browser has no built-in voice, so the speaker button is hidden.')),
+        h('p', null, SAY.ok ? 'Read aloud: tap the speaker at the top of any question or result to hear it, and tap again to stop. It uses this device\'s own voice' + (SAY.voice ? ' (' + SAY.voice.name + ')' : S.voice === DEFAULT_VOICE ? ' (device default)' : '') + ' and works offline.' : 'Read aloud: this browser has no built-in voice, so the speaker button is hidden.')),
       backupPanel(),
       h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Course material and disclaimer'), notices()),
       h('p', { class: 'copy' }, COPY),
@@ -462,6 +474,7 @@
       h('h2', null, 'Practise'), chips,
       h('div', { class: 'tiles' },
         tile('★', 'Train me', 'Smart mix of your weak spots', function () { train(m); }, 'wide accent'),
+        rdUnitChs(m).length ? tile('¶', unitFilter < 0 ? 'Read the module' : 'Read the unit', rdTileSub(m), function () { rdModule(m); }, 'wide read') : null,
         tile('▤', 'Flash cards', 'Recall, then rate yourself', function () { cardsMode(m); }),
         tile('⇄', 'Match up', 'Pair terms and meanings', function () { matchMode(m); }),
         tile('…', 'Missing word', 'Complete the sentence', function () { fillMode(m); }),
@@ -1142,7 +1155,8 @@
     r.pos = r.pos || {}; if (r.size == null) r.size = 1; if (r.rate == null) r.rate = 1;
     return r;
   }
-  function rdChapters() { return RD && RD.chapters ? RD.chapters : []; }
+  // chapters with mod/unit (engine 1.5.0) are read from the module screen; the rest from the home card
+  function rdChapters() { return RD && RD.chapters ? RD.chapters.filter(function (c) { return !c.mod; }) : []; }
   function rdFrac(ch) {
     var p = rdState().pos[ch.id]; if (!p) return 0;
     return p.done ? 1 : Math.min(1, (p.b + 1) / Math.max(1, ch.blocks.length));
@@ -1337,6 +1351,204 @@
   }
   // leaving the reader: stop scroll tracking, wake lock and the reading layout
   function rdLeave(to) { return function () { window.onscroll = null; rdWake(false); app.classList.remove('reading'); to(); }; }
+
+  /* ---------- read the unit / read the module (engine 1.5.0) ----------
+     Reader chapters that carry mod and unit (content/readerN.js) belong to one unit of one module.
+     The module screen offers them under Train me: one unit chosen = "Read the unit", All units =
+     "Read the module" with every unit on one scrolling page under a sticky bar (unit, "3 of 5 in
+     Module Three", % read, progress line). Listen reads block by block (each bullet on its own),
+     highlights and follows it, carries on unit after unit and stops at the end.
+     The place is saved per chapter in S.reader.pos (the same record the chapter reader uses), from
+     scrolling and from listening, so Save and Import carry it. It never feeds mastery or exam scores. */
+  function rdUnitChs(m) {
+    if (!RD || !RD.chapters) return [];
+    return RD.chapters.filter(function (c) {
+      return c.mod === m.id && c.unit >= 0 && c.unit < m.units.length && (unitFilter < 0 || c.unit === unitFilter) && c.blocks && c.blocks.length;
+    }).sort(function (a, b) { return a.unit - b.unit; });
+  }
+  // furthest block reached; still on the first block = not started (as in the original IFE app)
+  function rdUFrac(ch) {
+    var p = rdState().pos[ch.id]; if (!p) return 0; if (p.done) return 1;
+    var best = Math.max(p.best || 0, p.b || 0);
+    return best > 0 ? Math.min(1, (best + 1) / ch.blocks.length) : 0;
+  }
+  function rdTileSub(m) {
+    var chs = rdUnitChs(m);
+    if (unitFilter >= 0) {
+      var ch = chs[0], p = rdState().pos[ch.id], f = rdUFrac(ch);
+      return m.units[unitFilter] + (p && p.done ? ': finished' : f > 0 ? ': ' + pct(f) + ' read, carry on' : SAY.ok ? ': read it or listen' : '');
+    }
+    var any = chs.some(function (c) { return rdUFrac(c) > 0; });
+    return 'Every unit in turn' + (any ? ': pick up where you left off' : SAY.ok ? ': read it or listen' : '');
+  }
+  function rdModule(m) {
+    var chs = rdUnitChs(m), one = unitFilter >= 0, back = function () { modScreen(m); }, r = rdState();
+    var title = one ? 'Read the unit' : 'Read the module';
+    if (!chs.length) { show(topbar(title, back), h('p', { class: 'lead' }, 'No reading notes for this unit yet.')); return; }
+    r.mlast = r.mlast || {};
+    var label = h('span', null, chs[0].title), count = h('small', null, '');
+    var listen = SAY.ok ? btn('▶ Listen', 'primary', function () { readAloud(); }) : null;
+    var prog = bar(0, 'thin rdprog'), stick = h('div', { class: 'rdstick' }, h('div', { class: 'rdnow' }, h('div', { class: 'rdwhere' }, label, count), listen), prog);
+    // steps: what is highlighted and read, in page order. k = chapter on the page, b = block it saves as
+    var steps = [], secs = [];
+    var body = h('div', { class: 'reader rtext', lang: 'en-GB', style: '--rsize:' + RSIZE[r.size] }, chs.map(function (ch, k) {
+      var hd = h('h3', { class: 'rdh' }, ch.title); steps.push({ el: hd, k: k, b: 0, t: sayEnd(ch.title) });
+      var sec = h('section', { class: 'rdunit' }, hd, ch.blocks.map(function (b, i) {
+        var el;
+        if (Array.isArray(b)) {
+          var t = b[0], v = b[1];
+          if (t === 'h') el = h('h4', { class: 'rh' }, v);
+          else if (t === 'ul' || t === 'ol') {
+            el = h(t, { class: 'rlist' }, v.map(function (x, j) {
+              var li = h('li', null, x); steps.push({ el: li, k: k, b: i, t: sayEnd((t === 'ol' ? (j + 1) + '. ' : '') + x) }); return li;
+            }));
+            return el;
+          }
+          else if (t === 'note') el = h('aside', { class: 'rnote' }, v);
+          else el = h('p', null, v);
+        } else el = rdFigure(b, function () { readAloud(stepOf(el)); });
+        steps.push({ el: el, k: k, b: i, t: rdSpeech(b) });
+        return el;
+      }));
+      secs.push(sec); return sec;
+    }));
+    function stepOf(el) { for (var i = 0; i < steps.length; i++) if (steps[i].el === el) return i; return 0; }
+    var endText = one ? 'End of ' + chs[0].title + '.' : 'End of ' + m.title + ': all ' + chs.length + ' units.';
+    var end = h('div', { class: 'panel rdend' }, h('p', null, h('b', null, endText)),
+      h('p', { class: 'hint' }, 'Your reading place is saved for each unit. Reading and listening do not count towards your mastery or exam scores.'),
+      btn('Back to module', 'primary', back));
+    show(topbar(title, back), stick,
+      h('p', { class: 'hint' }, (RD.note ? RD.note + ' ' : '') + (SAY.ok ? 'Tap Listen to hear it; it starts from the top of what is on screen.' : '')),
+      body, end);
+
+    var top = app.querySelector('header.top'), raf = 0, saveT = 0, recording = false;
+    function place() { stick.style.top = (top ? top.offsetHeight : 0) + 'px'; }
+    function flush() { if (saveT) { clearTimeout(saveT); saveT = 0; save(); } }
+    // remember block b of chapter k as the place to come back to
+    function mark(k, b) {
+      if (!recording) return;
+      var ch = chs[k], n = ch.blocks.length, p = r.pos[ch.id] = r.pos[ch.id] || { b: 0 };
+      p.b = b; p.best = Math.max(p.best || 0, b); if (b >= n - 1) p.done = true;
+      r.mlast[m.id] = ch.id;
+      if (saveT) clearTimeout(saveT);
+      saveT = setTimeout(function () { saveT = 0; save(); }, 800);
+    }
+    function edge() { return stick.getBoundingClientRect().bottom + 8; }
+    function track() {
+      raf = 0;
+      var e = edge(), k = 0;
+      for (var i = 0; i < secs.length; i++) if (secs[i].getBoundingClientRect().top <= e) k = i;
+      var max = document.documentElement.scrollHeight - window.innerHeight, atEnd = max > 0 && window.pageYOffset >= max - 4;
+      if (!SAY.on) { // while listening, the voice sets the place
+        if (atEnd) mark(chs.length - 1, chs[chs.length - 1].blocks.length - 1);
+        else for (var j = 0; j < steps.length; j++) if (steps[j].k === k && steps[j].el.getBoundingClientRect().bottom > e) { mark(k, steps[j].b); break; }
+      }
+      var ch = chs[k], p = r.pos[ch.id], f = rdUFrac(ch), sep = chs.length > 1 ? ' · ' : '';
+      label.textContent = ch.title;
+      count.textContent = (chs.length > 1 ? (k + 1) + ' of ' + chs.length + ' in ' + m.title : '') +
+        (p && p.done ? sep + 'finished' : f > 0 ? sep + pct(f) + ' read' : '');
+      prog.firstChild.style.width = (max > 0 ? Math.min(100, Math.round(window.pageYOffset / max * 100)) : 100) + '%';
+    }
+    // scroll so block b of chapter k sits just under the sticky bars
+    function goTo(k, b) {
+      var el = secs[k];
+      if (b > 0) for (var i = 0; i < steps.length; i++) if (steps[i].k === k && steps[i].b === b) { el = steps[i].el; break; }
+      var bars = (top ? top.getBoundingClientRect().height : 0) + stick.getBoundingClientRect().height;
+      window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - bars - 10));
+    }
+    function resumeAt(ch) { var p = r.pos[ch.id]; return !p || p.done ? 0 : Math.min(p.b || 0, ch.blocks.length - 1); }
+    function closeBox() { var bg = document.querySelector('.rdmodal'); if (bg) bg.remove(); }
+    function begin(k, b) { closeBox(); goTo(k, b); recording = true; track(); }
+    // the dialogue: resume or start again (one unit), or which unit to resume (all units)
+    function askResume() {
+      var rows, msg, anySaved = chs.some(function (c) { return rdUFrac(c) > 0; });
+      if (!anySaved) return begin(0, 0);
+      if (one) {
+        var ch = chs[0], b = resumeAt(ch);
+        if (b === 0) return begin(0, 0);
+        var st = steps.filter(function (x) { return x.k === 0 && x.b === b; })[0];
+        var wl = (st ? st.el.textContent : '').trim().split(/\s+/), words = wl.length > 10 ? wl.slice(0, 9).join(' ').replace(/[,;:.]$/, '') + '…' : wl.join(' ');
+        msg = h('p', null, 'You stopped ' + pct(rdUFrac(ch)) + ' of the way through, at: “' + words + '”');
+        rows = [btn('Resume where I left off', 'primary', function () { begin(0, b); }), btn('Start from the beginning', '', function () { begin(0, 0); })];
+      } else {
+        var lastId = r.mlast[m.id];
+        msg = h('p', null, 'Which unit would you like to resume?');
+        rows = chs.map(function (c, k) {
+          var p = r.pos[c.id], f = rdUFrac(c), st = !f ? 'Not started' : p.done ? 'Finished: starts again from the top' : pct(f) + ' read: resumes where you stopped';
+          return h('button', { class: 'rdpick' + (lastId === c.id ? ' last' : ''), type: 'button', onclick: function () { begin(k, resumeAt(c)); } },
+            h('strong', null, c.title), h('small', null, st + (lastId === c.id ? ' · last read' : '')));
+        }).concat([btn('Start from the beginning of the module', '', function () { begin(0, 0); })]);
+      }
+      var box = h('div', { class: 'rdbox', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Resume reading' }, h('h3', null, one ? 'Carry on reading?' : 'Pick up where you left off'), msg, rows);
+      // on the page body, not inside #app: on laptops #app is a frosted (backdrop-filter) panel, which would
+      // make a fixed dialogue centre on the whole page height instead of the window
+      document.body.appendChild(h('div', { class: 'rdmodal' }, box));
+    }
+    window.onscroll = function () { if (!raf) raf = requestAnimationFrame(track); };
+    window.onresize = function () { place(); if (!raf) raf = requestAnimationFrame(track); };
+    window.addEventListener('pagehide', flush);
+    LEAVE = function () {
+      window.onresize = null; if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('pagehide', flush); flush(); closeBox(); rdWake(false);
+    };
+    place(); track(); askResume();
+
+    // read aloud from step `from` (a picture's Describe button), or from the top of what is on screen
+    function readAloud(from) {
+      if (!SAY.ok) return;
+      var only = from != null, wasMine = !only && SAY.on && SAY.btn === listen;
+      sayStop(); sayNote(''); lit(-1);
+      if (wasMine) { rdWake(false); return; } // second tap stops
+      var start = from || 0;
+      if (!only && window.pageYOffset > 10) { var e = edge() - 4; for (var i = 0; i < steps.length; i++) if (steps[i].el.getBoundingClientRect().bottom > e) { start = i; break; } }
+      var tok = SAY.tok, started = false, ss = window.speechSynthesis;
+      SAY.on = true; SAY.btn = only ? null : listen; sayMark(SAY.btn, true); rdWake(true);
+      function done(finished) {
+        flush();
+        if (tok !== SAY.tok) return;
+        lit(-1); SAY.on = false; sayMark(SAY.btn, false); SAY.btn = null; rdWake(false);
+        if (finished && !only) sayNote(one ? 'Finished: that is the whole of ' + chs[0].title + '.' : 'Finished: you have heard all ' + chs.length + ' units of ' + m.title + '.');
+      }
+      function step(i, useVoice) {
+        if (tok !== SAY.tok) return;
+        if (i >= steps.length || (only && i > start)) return done(true);
+        var s = steps[i];
+        if (!only) { recording = true; mark(s.k, s.b); }
+        var fig = s.el.querySelector && s.el.querySelector('.rdesc');
+        if (fig && fig.hidden) { var db = s.el.querySelector('.rdbtn'); fig.hidden = false; if (db) { db.textContent = 'Hide description'; db.setAttribute('aria-expanded', 'true'); } }
+        lit(i);
+        var rc = s.el.getBoundingClientRect();
+        if (rc.top < edge() || rc.bottom > window.innerHeight - 20) { try { s.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) { s.el.scrollIntoView(); } }
+        sent(i, saySplit(sayClean(s.t)), 0, useVoice);
+      }
+      function sent(i, parts, j, useVoice) {
+        if (tok !== SAY.tok) return;
+        if (j >= parts.length) return step(i + 1, useVoice);
+        var u = new window.SpeechSynthesisUtterance(parts[j]);
+        u.lang = 'en-GB'; u.rate = RRATE[r.rate]; u.pitch = 1; u.volume = 1;
+        if (useVoice && SAY.voice) u.voice = SAY.voice;
+        u.onstart = function () { started = true; };
+        u.onend = function () { if (tok === SAY.tok) sent(i, parts, j + 1, useVoice); };
+        u.onerror = function (ev) {
+          if (tok !== SAY.tok) return;
+          var why = ev && ev.error;
+          if (why === 'interrupted' || why === 'canceled') return done(false);
+          if (!started && useVoice && SAY.voice) return sent(i, parts, j, false); // chosen voice failed: device default
+          done(false); sayNote('Read aloud stopped (' + (why || 'unknown error') + '). Tap Listen to carry on from here.');
+        };
+        ss.speak(u);
+        if (ss.paused) ss.resume();
+      }
+      try { step(start, true); } catch (x) { done(false); sayNote('Read aloud could not start: ' + x.message); return; }
+      setTimeout(function () {
+        if (tok === SAY.tok && !started) sayNote('No sound yet? On iPhone and iPad, read aloud is silent when the phone is on Silent: turn Silent off, turn the volume up and tap Listen again.');
+      }, 2500);
+    }
+    function lit(i) {
+      var on = body.querySelector('.rdon'); if (on) on.classList.remove('rdon');
+      if (i >= 0) steps[i].el.classList.add('rdon');
+    }
+  }
 
   /* ---------- start ---------- */
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {

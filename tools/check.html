@@ -14,7 +14,7 @@
 <script>
 /* Setup check for course authors: manifest matches course.js, every file loads, revision mixes add up,
    unit indexes exist, fills have 3 wrong options, every unit appears in a revision day, module ids are unique,
-   reader chapters load and every picture has a description and alt text (engine 1.1.0). */
+   reader chapters load and every picture has a description and alt text (engine 1.1.0), and chapters linked to a module unit point at a real unit (engine 1.5.0). */
 (function () {
   var id = new URLSearchParams(location.search).get('c'), out = document.getElementById('out'), base = '../courses/' + id + '/';
   function say(ok, msg) { var li = document.createElement('li'); li.className = ok ? 'ok' : 'no'; li.textContent = (ok ? '✓ ' : '✗ ') + msg; out.appendChild(li); }
@@ -47,10 +47,17 @@
       if (C.reader && C.reader.length) {
         if (!RD || !RD.chapters || !RD.chapters.length) say(false, 'reader is set in course.js but no chapters loaded (files must start self.COURSE_READER)');
         else {
-          var rseen = {}, figs = 0, nodesc = [], noalt = [], badb = [], pics = [];
+          var rseen = {}, useen = {}, linked = 0, figs = 0, nodesc = [], noalt = [], badb = [], pics = [];
           RD.chapters.forEach(function (ch, ci) {
             if (!/^[a-z0-9]{1,20}$/.test(ch.id || '')) say(false, 'reader chapter ' + ci + ' needs an id of lowercase letters and digits');
             if (rseen[ch.id]) say(false, 'reader chapter id ' + ch.id + ' used twice'); rseen[ch.id] = true;
+            // engine 1.5.0: a chapter with mod and unit is read from that module unit (Read the unit / Read the module)
+            if (ch.mod != null || ch.unit != null) {
+              var mm = MODS.filter(function (m) { return m.id === ch.mod; })[0], key = ch.mod + '/' + ch.unit;
+              if (!mm) say(false, 'reader chapter ' + ch.id + ': mod ' + ch.mod + ' is not a module id');
+              else if (!(ch.unit >= 0 && ch.unit < mm.units.length)) say(false, 'reader chapter ' + ch.id + ': unit ' + ch.unit + ' is not in ' + ch.mod);
+              else { if (useen[key]) say(false, 'reader chapters ' + useen[key] + ' and ' + ch.id + ' are both for ' + key); useen[key] = ch.id; linked++; }
+            }
             (ch.blocks || []).forEach(function (b, bi) {
               var at = ch.id + ' block ' + bi;
               if (Array.isArray(b)) { if (['h', 'p', 'ul', 'ol', 'note'].indexOf(b[0]) < 0) badb.push(at); return; }
@@ -62,7 +69,7 @@
               if (b.src) pics.push(b.src);
             });
           });
-          say(true, RD.chapters.length + ' reader chapters, ' + figs + ' pictures and tables');
+          say(true, RD.chapters.length + ' reader chapters' + (linked ? ' (' + linked + ' linked to module units)' : '') + ', ' + figs + ' pictures and tables');
           say(!badb.length, badb.length ? 'reader blocks not understood: ' + badb.join(', ') : 'every reader block is a known type');
           say(!nodesc.length, nodesc.length ? 'pictures with no description (read aloud needs one): ' + nodesc.join(', ') : 'every picture has a description');
           say(!noalt.length, noalt.length ? 'pictures with no short alt text: ' + noalt.join(', ') : 'every picture has alt text');
