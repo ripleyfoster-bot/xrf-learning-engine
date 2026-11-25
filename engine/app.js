@@ -250,12 +250,20 @@
   function bar(frac, cls) { return h('div', { class: 'bar ' + (cls || '') }, h('i', { style: 'width:' + Math.round(frac * 100) + '%' })); }
 
   /* ---------- item index and mastery ---------- */
+  // Why reasons (engine 1.6.0): content/why.js, { 'm1.f0': [reason, pack page or source label] }, shown after
+  // every checked missing-word and question item, right or wrong. Ported from the original IFE app v0.12.
+  var WHY = window.COURSE_WHY || {};
+  function whyLine(m, t) {
+    if (!t || !t.why) return null;
+    return h('p', { class: 'why' }, h('b', null, 'Why: '), t.why[0], h('small', null, typeof t.why[1] === 'number'
+      ? ' ' + (LBL.pack || 'Course pack') + ': ' + m.title + ', ' + m.units[t.u] + ', page ' + t.why[1] + '.' : ' Source: ' + t.why[1] + '.'));
+  }
   function build(m) {
     var it = [];
     ['cards', 'fills', 'questions', 'matches', 'diagrams'].forEach(function (k) { m[k] = m[k] || []; });
     m.cards.forEach(function (c, i) { it.push({ id: m.id + '.c' + i, type: 'card', u: c[0], q: c[1], a: c[2] }); });
-    m.fills.forEach(function (f, i) { it.push({ id: m.id + '.f' + i, type: 'fill', u: f[0], text: f[1], a: f[2], d: f[3] }); });
-    m.questions.forEach(function (q, i) { it.push({ id: m.id + '.q' + i, type: 'q', u: q.u, q: q.q, o: q.o, a: q.a, order: q.order, f: q.f, g: q.g || [], x: q.x, src: q.src }); });
+    m.fills.forEach(function (f, i) { it.push({ id: m.id + '.f' + i, type: 'fill', u: f[0], text: f[1], a: f[2], d: f[3], why: WHY[m.id + '.f' + i] }); });
+    m.questions.forEach(function (q, i) { it.push({ id: m.id + '.q' + i, type: 'q', u: q.u, q: q.q, o: q.o, a: q.a, order: q.order, f: q.f, g: q.g || [], x: q.x, src: q.src, why: WHY[m.id + '.q' + i] }); });
     m.matches.forEach(function (s, i) { s.pairs.forEach(function (p, j) { it.push({ id: m.id + '.p' + i + '.' + j, type: 'pair', u: s.u, set: i, k: j }); }); });
     m.diagrams.forEach(function (d, i) { d.marks.forEach(function (k, j) { it.push({ id: m.id + '.d' + i + '.' + j, type: 'mark', u: d.u, dg: i, k: j }); }); });
     m._items = it;
@@ -300,7 +308,7 @@
       var rs = rvState(), dn = rvDayNow();
       list.push(h('button', { class: 'modcard rvcard', type: 'button', onclick: rvHome },
         h('strong', null, RV.title), h('span', null, RV.subtitle + ': every module, in ' + (TXT.formatsHome || 'the exam formats')),
-        bar(rs.start ? Math.min(ND, dn) / ND : 0), h('small', null, rs.start ? (dn > ND ? 'All ' + ND + ' days open' : 'Day ' + dn + ' of ' + ND) : 'Not started')));
+        bar(rs.unlocked ? 1 : rs.start ? Math.min(ND, dn) / ND : 0), h('small', null, rs.unlocked ? 'All ' + ND + ' days unlocked' : rs.start ? (dn > ND ? 'All ' + ND + ' days open' : 'Day ' + dn + ' of ' + ND) : 'Not started')));
     }
     show(h('header', { class: 'top home' }, logo(36), h('h1', null, CFG.name), h('button', { class: 'link', type: 'button', onclick: about }, 'About')),
       h('p', { class: 'lead' }, 'Pick a module. The app tracks what you know and steers practice to your weak spots.'), list);
@@ -332,12 +340,30 @@
         SAY.ok ? (function () { var tb = btn('🔊 Test the voice', '', function () { say('Read aloud is working. This is the voice the app will use for questions.', tb); }); return tb; })() : null,
         h('p', null, SAY.ok ? 'Read aloud: tap the speaker at the top of any question or result to hear it, and tap again to stop. It uses this device\'s own voice' + (SAY.voice ? ' (' + SAY.voice.name + ')' : S.voice === DEFAULT_VOICE ? ' (device default)' : '') + ' and works offline.' : 'Read aloud: this browser has no built-in voice, so the speaker button is hidden.')),
       backupPanel(),
+      unlockPanel(),
       h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Course material and disclaimer'), notices()),
       h('p', { class: 'copy' }, COPY),
       btn('Reset all progress', 'bad', function () {
         // keeps the user's details and agreement; erases learning progress only
         if (window.confirm('Erase all progress on this device?')) { S = { v: 1, items: {}, exams: {}, user: S.user }; save(); home(); }
       }));
+  }
+
+  /* ---------- "Exam soon?" (engine 1.6.0): open every Revision day and the mock at once ---------- */
+  // The choice is kept in S.rev, so Save and Import carry it. Unticking goes back to one day at a time; scores are kept.
+  function unlockPanel() {
+    if (!RV || !ND) return null;
+    var r = rvState(), all = (MOCKDAY ? 'all days and the full mock' : 'all days');
+    var tick = h('input', { type: 'checkbox', id: 'rvunlock' }); tick.checked = !!r.unlocked;
+    var msg = h('p', { class: 'hint gap', role: 'status' });
+    tick.addEventListener('change', function () {
+      r.unlocked = tick.checked; save();
+      msg.textContent = tick.checked ? 'Every Revision day' + (MOCKDAY ? ' and the full mock are' : ' is') + ' now open.' : 'Back to one day at a time from your start date. Scores are kept.';
+    });
+    return h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Exam soon?'),
+      h('p', null, 'The Revision countdown opens one day at a time over ' + ND + ' days. If your exam is sooner, release it to open ' + all + ' now.'),
+      h('label', { class: 'agree', for: 'rvunlock' }, tick, h('span', null, 'Release the ' + ND + '-day countdown: open ' + all + ' now')),
+      msg);
   }
 
   /* ---------- save and import: one file holding progress, exam history and settings ---------- */
@@ -517,7 +543,7 @@
 
   /* ---------- task renderers ---------- */
   function feedback(m, ok, text, t) {
-    var box = h('div', { class: 'fb ' + (ok ? 'ok' : 'no') }, h('strong', null, ok ? 'Correct. ' : 'Not quite. '), text || '', t && t.x ? h('p', { class: 'note' }, t.x) : null);
+    var box = h('div', { class: 'fb ' + (ok ? 'ok' : 'no') }, h('strong', null, ok ? 'Correct. ' : 'Not quite. '), text || '', whyLine(m, t), t && t.x ? h('p', { class: 'note' }, t.x) : null);
     add(box, sayBox(box));
     if (!ok && AI.on) {
       var out = h('p', { class: 'ai' });
@@ -729,7 +755,7 @@
             if (!picks.length) rows.unshift(h('li', { class: 'no' }, 'Not answered.'));
             detail = h('ul', { class: 'marks' }, rows);
           }
-          return h('div', { class: 'panel rev' }, h('p', { class: 'q' }, t.q), detail, t.x ? h('p', { class: 'note' }, t.x) : null, h('small', null, m.units[t.u]));
+          return h('div', { class: 'panel rev' }, h('p', { class: 'q' }, t.q), detail, whyLine(m, t), t.x ? h('p', { class: 'note' }, t.x) : null, h('small', null, m.units[t.u]));
         }),
         btn('Back to module', 'primary', function () { modScreen(m); }));
     }
@@ -1017,7 +1043,8 @@
     return Math.round((b - a) / 86400000);
   }
   function rvDayNow() { var r = rvState(); return r.start ? Math.max(1, daysSince(r.start) + 1) : 0; }
-  function dayOpen(n) { var r = rvState(); return r.start ? daysSince(r.start) >= n - 1 : n === 1; }
+  // r.unlocked (About: "Exam soon?", engine 1.6.0) opens every day and the mock now, for an exam sooner than the countdown
+  function dayOpen(n) { var r = rvState(); if (r.unlocked) return true; return r.start ? daysSince(r.start) >= n - 1 : n === 1; }
   function inDay(day, c) {
     if (c.day) return c.day === day.n;
     return !!c.m && day.units.some(function (p) { return p[0] === c.m.id && p[1] === c.u; });
@@ -1085,8 +1112,8 @@
     });
     show(topbar('Revision', home),
       h('div', { class: 'panel hero' },
-        h('div', { class: 'big' }, r.start ? (now > ND ? 'Done' : 'Day ' + now) : ND + ' days'),
-        h('div', null, r.start ? (now > ND ? 'All ' + numWord(ND) + ' days are open. Keep sitting papers.' : 'of ' + ND + ' · started ' + r.start.split('-').reverse().join('/')) : 'One exam-style paper a day, in ' + (TXT.formatsRevision || 'the exam formats') + '.'),
+        h('div', { class: 'big' }, r.unlocked ? 'All open' : r.start ? (now > ND ? 'Done' : 'Day ' + now) : ND + ' days'),
+        h('div', null, r.unlocked ? 'Countdown released: every day' + (MOCKDAY ? ' and the full mock are' : ' is') + ' open. Turn this off in About.' : r.start ? (now > ND ? 'All ' + numWord(ND) + ' days are open. Keep sitting papers.' : 'of ' + ND + ' · started ' + r.start.split('-').reverse().join('/')) : 'One exam-style paper a day, in ' + (TXT.formatsRevision || 'the exam formats') + '.'),
         h('div', { class: 'ready' }, 'Exam conditions: no feedback until you finish. ' + (TXT.modulesOpen || 'Every module stays open for practice at any time.'))),
       h('h2', null, 'Your countdown'), rows, mock,
       h('h2', null, 'Score by exam format'), fs,

@@ -24,7 +24,7 @@
   load(base + 'course.js').then(function () {
     var C = self.COURSE; say(true, 'course.js loaded: ' + C.name + ' v' + C.version);
     if (!/^[a-z0-9]{2,20}$/.test(C.id)) say(false, 'id should be 2 to 20 lowercase letters and digits only'); else if (C.id !== id) say(false, 'id in course.js (' + C.id + ') differs from the folder name (' + id + ')'); else say(true, 'id matches folder; progress key: xrf.' + C.id + '.progress.v1');
-    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : [], (C.reader || []).map(function (r) { return 'content/' + r + '.js'; }));
+    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : [], C.why ? ['content/why.js'] : [], (C.reader || []).map(function (r) { return 'content/' + r + '.js'; }));
     var assets = ['index.html', 'sw.js', 'brand/icon-180.png', 'brand/icon-192.png', 'brand/icon-512.png'].concat(C.brand && C.brand.logo ? [C.brand.logo] : [], C.brand && C.brand.bg ? [C.brand.bg] : []);
     var checks = assets.map(function (f) { return head(base + f).then(function () { say(true, f + ' found'); }, function () { say(false, f + ' missing'); }); });
     checks.push(fetch(base + 'manifest.webmanifest', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (m) {
@@ -43,6 +43,19 @@
         ['questions', 'matches', 'diagrams'].forEach(function (k, z) { (m[k] || []).forEach(function (x, i) { if (!(x.u >= 0 && x.u < n)) bad.push('qpd'[z] + i); }); });
         say(!bad.length, m.id + ': ' + (bad.length ? 'unit index out of range in ' + bad.join(', ') : 'all unit indexes valid'));
       });
+      // Why reasons (engine 1.6.0): every key names a missing-word or question item that exists
+      if (C.why) {
+        var W = self.COURSE_WHY;
+        if (!W) say(false, 'why is set in course.js but content/why.js did not set self.COURSE_WHY');
+        else {
+          var wk = Object.keys(W), wbad = wk.filter(function (k) {
+            var mt = /^(.+)\.([fq])(\d+)$/.exec(k), mm = mt && MODS.filter(function (m) { return m.id === mt[1]; })[0];
+            var list = mm && (mt[2] === 'f' ? mm.fills : mm.questions);
+            return !list || +mt[3] >= list.length || !Array.isArray(W[k]) || !W[k][0] || W[k][1] == null;
+          });
+          say(!wbad.length, wbad.length ? 'Why reasons with no matching item, or missing reason or source: ' + wbad.join(', ') : wk.length + ' Why reasons, every key names a real item');
+        }
+      }
       var RD = self.COURSE_READER;
       if (C.reader && C.reader.length) {
         if (!RD || !RD.chapters || !RD.chapters.length) say(false, 'reader is set in course.js but no chapters loaded (files must start self.COURSE_READER)');

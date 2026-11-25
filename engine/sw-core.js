@@ -15,6 +15,7 @@ var FILES = ['./', 'index.html', 'course.js', 'manifest.webmanifest', 'brand/ico
   '../../engine/version.js', '../../engine/loader.js', '../../engine/app.js', '../../engine/styles.css']
   .concat((C.modules || []).map(function (m) { return 'content/' + m + '.js'; }))
   .concat(C.revision ? ['content/revision.js'] : [])
+  .concat(C.why ? ['content/why.js'] : [])
   .concat(READER).concat(RFILES)
   .concat(C.brand && C.brand.logo ? [C.brand.logo] : [])
   .concat(C.brand && C.brand.bg ? [C.brand.bg] : []);

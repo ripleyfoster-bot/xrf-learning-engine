@@ -5,7 +5,7 @@
 self.COURSE = {
   id: 'ife3',                   // lowercase letters and digits only, same as the folder name.
                                 // Saved progress is kept under 'xrf.ife3.progress.v1' (made from this id).
-  version: '0.13.0',            // course version: bump on any change in this folder
+  version: '0.14.0',            // course version: bump on any change in this folder
   name: 'IFE Level 3 Revision',
   shortName: 'IFE L3',
   tagline: 'A revision companion for the ASFP Level 3 course',
@@ -21,6 +21,8 @@ self.COURSE = {
   revision: true,
   /* Reading notes (engine 1.5.0): one chapter per unit, read from the module screen (Read the unit / Read the module). */
   reader: ['reader1', 'reader2', 'reader3'],
+  /* Why reasons (engine 1.6.0): content/why.js, a reason after every checked missing-word and question item. */
+  why: true,
 
   /* Owner wording. {owner} in a notice becomes a link to owner.url.
      The engine adds its own copyright and "no responsibility" lines. */
