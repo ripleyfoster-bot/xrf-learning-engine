@@ -929,7 +929,7 @@
   function exam(m) {
     var t0 = Date.now();
     var paper = examPaper(m).map(function (t) {
-      return { m: m, u: t.u, id: t.id, fmt: t.order ? 'seq' : t.a.length > 1 ? 'mr' : 'mc', q: t.q, o: t.o, a: t.a, order: t.order, x: t.x, src: t.src };
+      return { m: m, u: t.u, id: t.id, fmt: t.order ? 'seq' : t.a.length > 1 ? 'mr' : 'mc', q: t.q, o: t.o, a: t.a, order: t.order, x: t.x, src: t.src, why: t.why };
     });
     paperRun({
       title: 'Final exam', paper: paper,
