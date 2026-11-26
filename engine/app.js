@@ -702,7 +702,7 @@
       RV ? sec(RV.title + ': the ' + ND + '-day countdown', false, [
         P('For the last ' + numWord(ND) + ' days before the exam. Day 1 opens when you start. Each day after that opens at midnight, and days you have reached stay open.'),
         UL(['Each day is a ' + RV.paperLength + '-question paper on that day\'s topics, in ' + (TXT.formatsRevision || 'the exam formats') + ', with no feedback until the end.',
-          MOCKDAY ? 'Day ' + MOCKDAY.n + ' adds the full mock exam: ' + RV.mockLength + ' questions from every module, like the real thing. Sit it in one go, somewhere quiet, and time yourself.' : null,
+          MOCKDAY ? 'Day ' + MOCKDAY.n + ' adds the full mock exam: ' + RV.mockLength + ' questions from every module, like the real thing. Sit it in one go, somewhere quiet. The app records how long you take.' : null,
           'The Results tab has the chart and league table for every paper. Filter by day or the mock, and tap a paper to see its weak units.',
           'Exam soon? If your exam is less than ' + ND + ' days away, tick the box at the bottom of the Countdown tab (or in About) to open every day' + (MOCKDAY ? ' and the mock' : '') + ' at once.']),
         P('Between papers, go back to the modules and use Train me on the units your results show are weak.')]) : null,
@@ -710,8 +710,8 @@
         'Weeks before: work through each module unit by unit' + (anyRead ? ': read the unit, then' : ':') + ' Train me until the unit reaches ' + target + '.',
         'When a module is at ' + target + ' everywhere, sit its final exam. Fix the weak units it shows, then sit it again.',
         RV ? 'Final week: start the ' + ND + '-day countdown, one paper a day, with Train me on whatever each paper shows up.' : null,
-        RV && MOCKDAY ? 'Day ' + MOCKDAY.n + ': the full mock. Book the real exam with confidence when your mocks are at ' + target + ' or above.' : null,
-        'Short and often beats long and rare: 15 minutes a day is better than two hours once a week.'])),
+        RV && MOCKDAY ? 'Day ' + MOCKDAY.n + ': the full mock. You are ready for the real exam when your mocks are at ' + target + ' or above.' : null,
+        'Short and often beats long and rare: a little every day keeps more in your memory than one long session a week.'])),
       sec('Settings and your data', false, UL([
         SAY.ok ? 'Read-aloud voice: choose it in About. On iPhone read aloud is silent when the phone is on Silent.' : null,
         'Save and import: in About. Save a file before changing phones, then import it on the new one.',

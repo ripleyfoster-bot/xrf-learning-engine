@@ -3,7 +3,7 @@
 One engine, many courses. Built from the IFE Level 3 Revision app (v0.10.2).
 Plain HTML and JavaScript, no build tools. Runs on GitHub Pages.
 
-| Version | Engine 1.6.0 · IFE course 0.14.0 · Demo course 0.2.0 |
+| Version | Engine 1.7.0 · IFE course 0.15.0 · Demo course 0.2.0 |
 | --- | --- |
 
 ## Layout
@@ -52,6 +52,7 @@ All apps on `ripleyfoster-bot.github.io` share one storage area; the `xrf.` pref
 The engine's IFE course does not share storage with the original IFE app (`ife3.progress.v1`). To move across, use Save my progress in the original app and Import a save here (`importFrom` in course.js).
 
 Read the unit (engine 1.5.0): reader chapters that carry `mod` and `unit` are read from the module screen, in a full-width tile under Train me. One unit chosen: Read the unit. All units: Read the module, every unit on one page under a sticky bar, with Listen reading on unit after unit. The reading place is saved per chapter (`reader.pos` in the saved data), from scrolling and listening, and a dialogue offers to resume. It never counts towards mastery or exam scores. The IFE course has 20 chapters of reading notes (`content/reader1.js` to `reader3.js`), ported unchanged from the original IFE app v0.15.2.
+Exams and results (engine 1.7.0): `examPass` in `course.js` sets the exam pass mark in marks out of `examLength` (IFE: 45 of 65); `passMark` stays the target (85%). Module screens have Study and Exams tabs; the countdown has Countdown and Results tabs. Each attempt keeps date, time taken, score and correct answers by unit, shown in a league table and a progress chart. A How to use page shows once on first opening, then from About (`text.realExam` adds a course's real-exam facts to it).
 Why reasons (engine 1.6.0): set `why: true` in `course.js` and add `content/why.js` (`self.COURSE_WHY`). A reason and its source show after every checked missing-word and question item. The IFE course has 720, ported unchanged from the original IFE app.
 Exam soon? (engine 1.6.0): a tick box in About opens every Revision day and the mock at once. Unticking goes back to one day at a time; scores are kept.
 Voice (engine 1.5.0): About offers "Device default (British English)", which names no voice and lets the device choose.
