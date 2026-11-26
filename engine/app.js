@@ -656,19 +656,71 @@
   }
 
   /* ---------- How to use (engine 1.7.0): shown once on first opening, then from About ---------- */
+  // Read a list of panels aloud in order (How to use): each one opens, is highlighted and scrolls into view
+  // as it is read. Tap the same button again, or leave the screen, to stop.
+  function sayParts(list, el) {
+    if (!SAY.ok) return;
+    var wasMine = SAY.on && SAY.btn === el;
+    sayStop(); sayNote(''); lit(null);
+    if (wasMine) return;
+    var tok = SAY.tok, started = false, ss = window.speechSynthesis;
+    SAY.on = true; SAY.btn = el; sayMark(el, true);
+    function lit(x) { var on = app.querySelector('.rdon'); if (on) on.classList.remove('rdon'); if (x) x.classList.add('rdon'); }
+    function done(fin) {
+      if (tok !== SAY.tok) return;
+      lit(null); SAY.on = false; sayMark(SAY.btn, false); SAY.btn = null;
+      if (fin) sayNote('Finished: that is the whole guide.');
+    }
+    function part(i, useVoice) {
+      if (tok !== SAY.tok) return;
+      if (i >= list.length) return done(true);
+      var x = list[i];
+      if (x.tagName === 'DETAILS') x.open = true;
+      lit(x);
+      try { x.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { x.scrollIntoView(); }
+      var text = [].map.call(x.querySelectorAll('summary, h2, p, li'), function (n) { return sayEnd(n.textContent.trim()); }).join(' ');
+      sent(i, saySplit(sayClean(text)), 0, useVoice);
+    }
+    function sent(i, ps, j, useVoice) {
+      if (tok !== SAY.tok) return;
+      if (j >= ps.length) return part(i + 1, useVoice);
+      var u = new window.SpeechSynthesisUtterance(ps[j]);
+      u.lang = 'en-GB'; u.rate = 1; u.pitch = 1; u.volume = 1;
+      if (useVoice && SAY.voice) u.voice = SAY.voice;
+      u.onstart = function () { started = true; };
+      u.onend = function () { if (tok === SAY.tok) sent(i, ps, j + 1, useVoice); };
+      u.onerror = function (e) {
+        if (tok !== SAY.tok) return;
+        var why = e && e.error;
+        if (why === 'interrupted' || why === 'canceled') return done(false);
+        if (!started && useVoice && SAY.voice) return sent(i, ps, j, false); // chosen voice failed: device default
+        done(false); sayNote('Read aloud stopped (' + (why || 'unknown error') + ').');
+      };
+      ss.speak(u);
+      if (ss.paused) ss.resume();
+    }
+    try { part(0, true); } catch (e) { done(false); sayNote('Read aloud could not start: ' + e.message); return; }
+    setTimeout(function () {
+      if (tok === SAY.tok && !started) sayNote('No sound yet? On iPhone and iPad, read aloud is silent when the phone is on Silent: turn Silent off, turn the volume up and tap Listen again.');
+    }, 2500);
+  }
   function firstHelp() {
     if (!S.helpSeen) { S.helpSeen = new Date().toISOString(); save(); return howTo(home, true); }
     home();
   }
   function howTo(back, first) {
     var anyRead = MODS.some(function (m) { return RD && RD.chapters && RD.chapters.some(function (c) { return c.mod === m.id; }); });
-    function sec(title, open, kids) { return h('details', { class: 'panel howto' }, h('summary', null, title), kids); }
+    var parts = []; // what Listen reads, in page order
+    function sec(title, open, kids) { var d = h('details', { class: 'panel howto' }, h('summary', null, title), kids); parts.push(d); return d; }
     var P = function (t) { return h('p', null, t); }, UL = function (a) { return h('ul', null, a.filter(Boolean).map(function (t) { return h('li', null, t); })); };
     var target = pct(CFG.passMark);
+    var real = CFG.text && CFG.text.realExam ? h('div', { class: 'panel hero' }, h('h2', { class: 'in' }, 'The real exam'), P(CFG.text.realExam),
+      hasTarget() ? P('Aim for ' + target + ' in your practice exams before you sit the real one. A margin makes up for nerves and questions you have not seen.') : null) : null;
+    if (real) parts.push(real);
+    var listen = SAY.ok ? btn('▶ Listen to this guide', 'hlisten', function () { sayParts(parts, listen); }) : null;
     show(topbar('How to use this app', back),
-      h('p', { class: 'lead' }, (first ? 'Welcome. ' : '') + 'This app helps you learn the course and then prove it under exam conditions. Tap a heading to open it.'),
-      CFG.text && CFG.text.realExam ? h('div', { class: 'panel hero' }, h('h2', { class: 'in' }, 'The real exam'), P(CFG.text.realExam),
-        hasTarget() ? P('Aim for ' + target + ' in your practice exams before you sit the real one. A margin makes up for nerves and questions you have not seen.') : null) : null,
+      h('p', { class: 'lead' }, (first ? 'Welcome. ' : '') + 'This app helps you learn the course and then prove it under exam conditions. Tap a heading to open it' + (SAY.ok ? ', or tap Listen to hear the whole guide.' : '.')),
+      listen, real,
       sec('How the app works', false, [
         P('Every flash card, missing word and question is tracked on this device. Each time you answer, the app moves that item up when you are right and down when you are wrong.'),
         P('Mastery is how far up your items are. A unit reaches 100% when you have answered its items correctly several times, not just once. Practice is steered towards the items you find hardest and the ones you have not seen yet.'),
@@ -718,6 +770,8 @@
         'Change my details: update your name, company or exam date in About.'])),
       btn(first ? 'Got it, take me to the course' : 'Done', 'primary', back),
       first ? h('p', { class: 'copy' }, 'You can open this guide again from About.') : null);
+    // Listen stays in view under the title bar, so Stop can be reached while the guide scrolls
+    var top = app.querySelector('header.top'); if (listen && top) listen.style.top = (top.offsetHeight + 4) + 'px';
   }
 
   /* ---------- session runner ---------- */
