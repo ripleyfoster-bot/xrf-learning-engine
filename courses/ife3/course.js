@@ -5,15 +5,16 @@
 self.COURSE = {
   id: 'ife3',                   // lowercase letters and digits only, same as the folder name.
                                 // Saved progress is kept under 'xrf.ife3.progress.v1' (made from this id).
-  version: '0.14.0',            // course version: bump on any change in this folder
+  version: '0.15.0',            // course version: bump on any change in this folder
   name: 'IFE Level 3 Revision',
   shortName: 'IFE L3',
   tagline: 'A revision companion for the ASFP Level 3 course',
   listed: true,                 // shown on the course list page
   importFrom: ['ife3'],         // also accept save files from the original IFE app (same item ids)
 
-  passMark: 0.85,
-  examLength: 40,
+  passMark: 0.85,               // target: score to reach in practice before the real exam (engine 1.7.0)
+  examLength: 65,               // module final exams: 65 questions, like the real IFE exam
+  examPass: 45,                 // exam pass mark: 45 of 65 (engine 1.7.0)
   ai: { enabled: false, endpoint: '', accessKey: null }, // never put an AI provider key here
 
   /* Content files in content/, in load order. revision: true loads content/revision.js. */
@@ -39,7 +40,9 @@ self.COURSE = {
   text: {
     formatsHome: 'the IFE exam formats',          // home screen: "...: every module, in the IFE exam formats"
     formatsRevision: 'the IFE online formats',    // revision screen: "One exam-style paper a day, in the IFE online formats."
-    modulesOpen: 'Modules One to Three stay open for practice at any time.'
+    modulesOpen: 'Modules One to Three stay open for practice at any time.',
+    // How to use page (engine 1.7.0)
+    realExam: 'The IFE Level 3 exam has 65 questions and you need 45 of them (69%) to pass. Each question is worth one mark. In this app, a question with several correct answers only scores if every part is right, so treat the real exam the same way.'
   },
   labels: { intro: 'Intro', unit: 'Unit', moduleTag: 'M' }, // unit chips; "M1" day tags
 

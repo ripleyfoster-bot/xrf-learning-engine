@@ -313,3 +313,55 @@ html::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 /* Why reasons (engine 1.6.0): under the Correct / Not quite line */
 .why { color: var(--ink); margin: 10px 0 0; padding-top: 10px; border-top: 1px solid rgba(127,127,127,.35); }
 .why small { display: block; color: var(--mute); margin-top: 4px; }
+
+/* engine 1.7.0: tabs, exam results (summary, chart, league table) and How to use */
+.tabs { display: flex; gap: 4px; padding: 4px; margin: 14px 0 6px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.tab { flex: 1; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--mute); font: inherit; font-weight: 600; cursor: pointer; }
+.tab.on { background: var(--accent); color: var(--accent-ink); }
+.gotoex { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.gotoex p { flex: 1; margin: 0; color: var(--mute); }
+.gotoex .btn { width: auto; margin: 0; white-space: nowrap; }
+.lgsum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 4px; }
+.lgsum > div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+.lgsum b { display: block; font-size: 1.35rem; }
+.lgsum small { color: var(--mute); }
+.cwrap { padding: 12px 10px 8px; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .cgrid { stroke: var(--line); stroke-width: 1; }
+.chart .cref { stroke: var(--mute); stroke-width: 1.5; }
+.chart .cref.tgt { stroke: var(--ink); }
+.chart .ctx { fill: var(--mute); font-size: 10px; font-family: inherit; }
+.chart .cline { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .cdot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.chart .cdot.on { stroke: var(--ink); }
+.chart .chit { fill: transparent; cursor: pointer; outline: none; }
+.ctip { margin: 6px 4px 0; font-size: 0.85rem; color: var(--ink); min-height: 1.3em; }
+.ckey { display: flex; gap: 16px; font-size: 0.8rem; color: var(--mute); margin: 0 4px 6px; }
+.ckey span { display: inline-flex; align-items: center; gap: 6px; }
+.kdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.kdot.sq { border-radius: 2px; }
+.lghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.lghead .seg { display: flex; gap: 6px; }
+.lghead .chip { margin: 0; }
+.lgrow { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 8px 0; }
+.lgrow > summary { display: grid; grid-template-columns: 30px 1fr auto auto; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; min-height: 52px; }
+.lgrow > summary::-webkit-details-marker { display: none; }
+.lgrow > summary::after { content: '▾'; color: var(--mute); grid-column: 4; grid-row: 1; justify-self: end; display: none; }
+.lgrank { font-weight: 700; color: var(--mute); text-align: center; }
+.lgwhen b, .lgpct b { display: block; }
+.lgwhen small, .lgpct small { color: var(--mute); font-size: 0.8rem; }
+.lgpct { text-align: right; }
+.lgtag { font-size: 0.75rem; font-weight: 600; padding: 3px 8px; border-radius: 99px; white-space: nowrap; background: var(--bg); color: var(--mute); border: 1px solid var(--line); }
+.lgtag.ready { background: var(--goodbg); color: var(--good); border-color: transparent; }
+.lgtag.pass { background: var(--bg); color: var(--ink); }
+.lgtag.below { background: var(--badbg); color: var(--bad); border-color: transparent; }
+.lgrow[open] > summary { border-bottom: 1px solid var(--line); }
+.lgrow > p, .lgrow > .urow { margin-left: 12px; margin-right: 12px; }
+.lgrow > p.hint { margin-top: 10px; }
+.lgrow > .urow:last-child { margin-bottom: 12px; }
+.lgtrain { font-size: 0.85rem; padding: 4px 0; min-height: 32px; }
+.howto { padding: 0; }
+.howto > summary { padding: 14px 16px; font-weight: 600; cursor: pointer; min-height: 48px; }
+.howto[open] > summary { border-bottom: 1px solid var(--line); }
+.howto > p, .howto > ul { margin: 12px 16px; }
+.howto li { margin: 6px 0; }

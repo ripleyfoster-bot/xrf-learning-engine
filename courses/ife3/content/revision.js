@@ -12,7 +12,7 @@ window.COURSE_REVISION = {
   title: 'Revision',
   subtitle: '7-day exam countdown',
   paperLength: 20,
-  mockLength: 40,
+  mockLength: 65,               // like the real IFE exam (65 questions, pass mark 45)
 
   /* The IFE online exam formats, plus diagrams. Order = order shown in results. */
   formats: [
@@ -28,7 +28,7 @@ window.COURSE_REVISION = {
   ],
   /* How many of each format on a daily paper (20) and on the Day 7 full mock (40). */
   paperMix: { mc: 3, mr: 3, type: 2, match: 2, select: 2, seq: 2, rank: 2, num: 2, diagram: 2 },
-  mockMix: { mc: 7, mr: 7, type: 3, match: 3, select: 3, seq: 4, rank: 6, num: 4, diagram: 3 },
+  mockMix: { mc: 11, mr: 11, type: 5, match: 5, select: 5, seq: 7, rank: 10, num: 6, diagram: 5 },   // adds up to 65; was 40 before 0.15.0
 
   /* units: [module id, unit index] */
   days: [
