@@ -25,6 +25,7 @@
   var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; });
   if (C.revision) files.push('content/revision.js');
   if (C.why) files.push('content/why.js'); // Why reasons (engine 1.6.0)
+  if (C.filter) files.push('content/filter.js'); // international exam tick (engine 1.8.0)
   (C.reader || []).forEach(function (r) { files.push('content/' + r + '.js'); }); // reader chapters (engine 1.1.0)
   files.push(engine + 'app.js');
   files.forEach(function (f) { var s = document.createElement('script'); s.src = f; s.async = false; document.body.appendChild(s); });

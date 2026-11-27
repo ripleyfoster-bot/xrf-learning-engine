@@ -24,7 +24,7 @@
   load(base + 'course.js').then(function () {
     var C = self.COURSE; say(true, 'course.js loaded: ' + C.name + ' v' + C.version);
     if (!/^[a-z0-9]{2,20}$/.test(C.id)) say(false, 'id should be 2 to 20 lowercase letters and digits only'); else if (C.id !== id) say(false, 'id in course.js (' + C.id + ') differs from the folder name (' + id + ')'); else say(true, 'id matches folder; progress key: xrf.' + C.id + '.progress.v1');
-    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : [], C.why ? ['content/why.js'] : [], (C.reader || []).map(function (r) { return 'content/' + r + '.js'; }));
+    var files = (C.modules || []).map(function (m) { return 'content/' + m + '.js'; }).concat(C.revision ? ['content/revision.js'] : [], C.why ? ['content/why.js'] : [], C.filter ? ['content/filter.js'] : [], (C.reader || []).map(function (r) { return 'content/' + r + '.js'; }));
     var assets = ['index.html', 'sw.js', 'brand/icon-180.png', 'brand/icon-192.png', 'brand/icon-512.png'].concat(C.brand && C.brand.logo ? [C.brand.logo] : [], C.brand && C.brand.bg ? [C.brand.bg] : []);
     var checks = assets.map(function (f) { return head(base + f).then(function () { say(true, f + ' found'); }, function () { say(false, f + ' missing'); }); });
     checks.push(fetch(base + 'manifest.webmanifest', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (m) {
@@ -43,6 +43,24 @@
         ['questions', 'matches', 'diagrams'].forEach(function (k, z) { (m[k] || []).forEach(function (x, i) { if (!(x.u >= 0 && x.u < n)) bad.push('qpd'[z] + i); }); });
         say(!bad.length, m.id + ': ' + (bad.length ? 'unit index out of range in ' + bad.join(', ') : 'all unit indexes valid'));
       });
+      // International exam tick (engine 1.8.0): every id names an item that exists
+      if (C.filter) {
+        var F = self.COURSE_FILTER, RVX = self.COURSE_REVISION || {};
+        if (!F || !F.items || !F.label || !F.short) say(false, 'filter is set in course.js but content/filter.js did not set self.COURSE_FILTER with label, short and items');
+        else {
+          var fbad = F.items.filter(function (id) {
+            var mt = /^([a-z0-9]+)\.([a-z])(\d+)(?:\.(\d+))?$/.exec(id);
+            if (!mt) return true;
+            if (mt[1] === 'rv') { var L = { n: RVX.numeric, o: RVX.orders, s: RVX.sorts }[mt[2]]; return !L || +mt[3] >= L.length; }
+            var mm = MODS.filter(function (m) { return m.id === mt[1]; })[0]; if (!mm) return true;
+            var list = { c: mm.cards, f: mm.fills, q: mm.questions, p: mm.matches, d: mm.diagrams }[mt[2]], x = list && list[+mt[3]];
+            if (!x) return true;
+            if (mt[4] != null) return mt[2] === 'p' ? +mt[4] >= x.pairs.length : mt[2] === 'd' ? +mt[4] >= x.marks.length : true;
+            return false;
+          });
+          say(!fbad.length, fbad.length ? 'International exam list names items that do not exist: ' + fbad.join(', ') : F.items.length + ' items on the international exam list, every id names a real item');
+        }
+      }
       // Why reasons (engine 1.6.0): every key names a missing-word or question item that exists
       if (C.why) {
         var W = self.COURSE_WHY;

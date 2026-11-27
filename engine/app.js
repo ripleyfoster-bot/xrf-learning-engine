@@ -294,16 +294,52 @@
     return { mastery: items.length ? sum / items.length : 0, seen: seen, total: items.length };
   }
   function unitItems(m, u) { return m._items.filter(function (x) { return x.u === u; }); }
+  /* International exam tick (engine 1.8.0): content/filter.js lists items (ids) that are specific to one country or
+     region, e.g. UK and European test standards. While S.filterOn is set they are still practised, but they
+     do not count towards mastery, progress bars or exam results. A set id (m2.p4) covers all its pairs. */
+  var FLT = window.COURSE_FILTER && window.COURSE_FILTER.items ? window.COURSE_FILTER : null, FSET = {};
+  if (FLT) FLT.items.forEach(function (id) { FSET[id] = true; });
+  function fOn() { return !!(FLT && S.filterOn); }
+  function isOut(id) { return fOn() && (FSET[id] || FSET[String(id).replace(/\.\d+$/, '')]) ? true : false; }
+  function counted(items) { return fOn() ? items.filter(function (x) { return !isOut(x.id); }) : items; }
+  // the tick itself, wherever results or progress are shown; redraw() repaints the screen it is on
+  function filterTick(redraw, full) {
+    if (!FLT) return null;
+    var tick = h('input', { type: 'checkbox', id: 'flt' + Math.random().toString(36).slice(2, 7) }); tick.checked = fOn();
+    tick.addEventListener('change', function () { S.filterOn = tick.checked; save(); if (redraw) redraw(); });
+    return h('div', { class: 'panel flt' + (fOn() ? ' on' : '') }, h('label', { class: 'agree', for: tick.id }, tick, h('span', null, FLT.label)),
+      full ? h('p', { class: 'hint' }, FLT.note) : fOn() ? h('p', { class: 'hint' }, 'Still practised, but not counted in mastery, progress or results.') : null);
+  }
+  // a saved attempt seen with the tick on: score and units recalculated without the tagged questions
+  function adjRec(rec, unitOf) {
+    if (!fOn()) return rec;
+    if (!rec.q) return Object.assign({}, rec, { old: true });
+    var s = 0, n = 0, u = {};
+    rec.q.forEach(function (id, i) {
+      if (isOut(id)) return;
+      var ok = rec.k.charAt(i) === '1', k = unitOf(id, i); n++; if (ok) s++;
+      if (k != null) { var b = u[k] = u[k] || [0, 0]; b[1]++; if (ok) b[0]++; }
+    });
+    return Object.assign({}, rec, { s: s, n: n, u: u, adj: true, s0: rec.s, n0: rec.n });
+  }
+  function filterLine(res) {
+    if (!fOn()) return null;
+    var kept = res.filter(function (x) { return !isOut((x.c || x).id); });
+    if (kept.length === res.length) return h('p', { class: 'hint' }, 'International exam view: this paper had no ' + FLT.short + ' questions.');
+    var s = kept.filter(function (x) { return x.ok; }).length, n = kept.length;
+    return h('p', { class: 'fltres' }, h('b', null, 'Without ' + FLT.short + ': '), n ? s + ' / ' + n + ' (' + pct(s / n) + ') · ' + GRADE[grade(s, n)] : 'no questions left', h('small', null, ' ' + (res.length - n) + ' question' + (res.length - n === 1 ? '' : 's') + ' left out.'));
+  }
   function inFilter(x) { return unitFilter < 0 || x.u === unitFilter; }
 
   /* ---------- home ---------- */
   function home() {
     var list = MODS.map(function (m) {
-      var st = stats(m._items);
+      var st = stats(counted(m._items));
       return h('button', { class: 'modcard', type: 'button', onclick: function () { unitFilter = -1; modTab = 'study'; modScreen(m); } },
         h('strong', null, m.title), h('span', null, m.subtitle), bar(st.mastery), h('small', null, pct(st.mastery) + ' mastered'));
     });
     var rdc = rdHomeCard(); if (rdc) list.unshift(rdc);
+    if (fOn()) list.push(h('p', { class: 'hint' }, FLT.label + ' is on: those questions do not count towards mastery or results. Change it in About.'));
     if (RV) {
       var rs = rvState(), dn = rvDayNow();
       list.push(h('button', { class: 'modcard rvcard', type: 'button', onclick: function () { rvTab = 'days'; rvHome(); } },
@@ -340,6 +376,7 @@
         })() : null,
         SAY.ok ? (function () { var tb = btn('🔊 Test the voice', '', function () { say('Read aloud is working. This is the voice the app will use for questions.', tb); }); return tb; })() : null,
         h('p', null, SAY.ok ? 'Read aloud: tap the speaker at the top of any question or result to hear it, and tap again to stop. It uses this device\'s own voice' + (SAY.voice ? ' (' + SAY.voice.name + ')' : S.voice === DEFAULT_VOICE ? ' (device default)' : '') + ' and works offline.' : 'Read aloud: this browser has no built-in voice, so the speaker button is hidden.')),
+      filterTick(about, true),
       backupPanel(),
       unlockPanel(),
       h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Course material and disclaimer'), notices()),
@@ -475,11 +512,11 @@
   function unitChip(m, u) { var un = LBL.unit || 'Unit'; return m.noIntro ? un + ' ' + (u + 1) : u === 0 ? (LBL.intro || 'Intro') : un + ' ' + u; }
   var modTab = 'study', rvTab = 'days';
   function modScreen(m) {
-    var all = stats(m._items);
-    var units = m.units.map(function (name, u) { return { u: u, name: name, st: stats(unitItems(m, u)) }; });
-    var ready = units.every(function (x) { return x.st.mastery >= CFG.passMark; });
+    var all = stats(counted(m._items));
+    var units = m.units.map(function (name, u) { return { u: u, name: name, st: stats(counted(unitItems(m, u))) }; });
+    var ready = units.every(function (x) { return x.st.total === 0 || x.st.mastery >= CFG.passMark; });
     var ex = S.exams[m.id] || [], best = 0;
-    ex.forEach(function (e) { best = Math.max(best, e.s / e.n); });
+    ex.forEach(function (e) { var a = adjRec(e, function () { return null; }); if (a.n) best = Math.max(best, a.s / a.n); });
 
     var chips = h('div', { class: 'chips' },
       [h('button', { class: 'chip' + (unitFilter < 0 ? ' on' : ''), type: 'button', onclick: function () { unitFilter = -1; modScreen(m); } }, 'All units')]
@@ -489,6 +526,7 @@
 
     var rows = units.map(function (x) {
       var cls = x.st.seen === 0 ? 'new' : x.st.mastery >= CFG.passMark ? 'good' : x.st.mastery < 0.5 ? 'weak' : '';
+      if (!x.st.total) return h('div', { class: 'urow' }, h('div', { class: 'uname' }, x.name, h('b', null, 'Not counted')), bar(0, 'new'));
       return h('div', { class: 'urow' }, h('div', { class: 'uname' }, x.name, h('b', null, x.st.seen === 0 ? 'Not started' : pct(x.st.mastery))), bar(x.st.mastery, cls));
     });
 
@@ -498,8 +536,9 @@
     show(topbar(m.title, home),
       h('div', { class: 'panel hero' },
         h('div', { class: 'big' }, pct(all.mastery)), h('div', null, 'mastered · ' + all.seen + ' of ' + all.total + ' items seen'),
-        h('div', { class: 'ready ' + (ready ? 'yes' : '') }, ready ? 'Every unit is at ' + pct(CFG.passMark) + ' or above. Try the final exam.' : 'Target: every unit at ' + pct(CFG.passMark) + ' before the final exam.'),
+        h('div', { class: 'ready ' + (ready ? 'yes' : '') }, ready ? 'Every unit is at ' + pct(CFG.passMark) + ' or above. Try the module exam.' : 'Target: every unit at ' + pct(CFG.passMark) + ' before the module exam.'),
         ex.length ? h('div', { class: 'best' }, 'Best exam score: ' + pct(best) + ' (' + ex.length + ' attempt' + (ex.length > 1 ? 's' : '') + ')') : null),
+      filterTick(function () { modScreen(m); }),
       tabs([['study', 'Study'], ['exams', 'Exams' + (ex.length ? ' (' + ex.length + ')' : '')]], modTab, function (k) { modTab = k; modScreen(m); }),
       modTab === 'exams' ? modExams(m) : [
       h('h2', null, 'Practise'), chips,
@@ -511,17 +550,20 @@
         tile('…', 'Missing word', 'Complete the sentence', function () { fillMode(m); }),
         tile('◎', 'Label the diagram', 'Tap labels into place', function () { diagramList(m); })),
       h('h2', null, 'Progress by unit'), rows,
-      h('div', { class: 'panel gotoex' }, h('p', null, 'Final exam, past scores and your progress chart are on the Exams tab.'),
-        btn('Go to Exams', '', function () { modTab = 'exams'; modScreen(m); window.scrollTo(0, 0); }))]);
+      h('h2', null, 'Module exam'),
+      h('div', { class: 'panel' }, h('p', null, CFG.examLength + ' questions across the whole module. ' + passLine(CFG.examLength, true) + '. No feedback until the end.'),
+        btn('Start module exam', 'primary', function () { exam(m); }),
+        btn('Past scores and chart', '', function () { modTab = 'exams'; modScreen(m); window.scrollTo(0, 0); }))]);
   }
-  // Exams tab (engine 1.7.0): start the final exam, chart of scores, league table of attempts
+  // Exams tab (engine 1.7.0): start the module exam, chart of scores, league table of attempts
   function modExams(m) {
     var ex = S.exams[m.id] || [];
-    return [h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Final exam'),
+    var unitOf = function (id) { var it = m._items.filter(function (x) { return x.id === id; })[0]; return it ? it.u : null; };
+    return [h('div', { class: 'panel' }, h('h2', { class: 'in' }, 'Module exam'),
         h('p', null, CFG.examLength + ' questions across the whole module. ' + passLine(CFG.examLength, true) + '. No feedback until the end.'),
-        btn('Start final exam', 'primary', function () { exam(m); })),
-      examsView({ recs: ex.map(function (e) { return { d: e.d, s: e.s, n: e.n, t: e.t, u: e.u }; }),
-        empty: 'No final exams yet. Your scores, time taken and weak units will appear here after your first attempt.',
+        btn('Start module exam', 'primary', function () { exam(m); })),
+      examsView({ recs: ex.map(function (e) { return adjRec({ d: e.d, s: e.s, n: e.n, t: e.t, u: e.u, q: e.q, k: e.k }, unitOf); }),
+        empty: 'No module exams yet. Your scores, time taken and weak units will appear here after your first attempt.',
         units: function (rec) {
           return rec.u ? Object.keys(rec.u).map(function (u) { return { name: m.units[u], s: rec.u[u][0], n: rec.u[u][1], go: function () { unitFilter = +u; modTab = 'study'; train(m); } }; }) : null;
         } })];
@@ -531,9 +573,11 @@
      Two lines matter. The exam pass mark comes from course.js examPass (marks out of examLength, e.g. 45 of 65);
      without it the pass mark is passMark, as before. passMark (e.g. 85%) is the target: the score to reach in
      practice before the real exam. One mark per question: a multiple-answer question scores only when every part is right. */
-  function passFrac() { return CFG.examPass ? CFG.examPass / CFG.examLength : CFG.passMark; }
+  // engine 1.8.0: realExam { questions, pass } is the real exam (IFE: 45 of 65), so module exams can be a different length
+  function passFrac() { var r = CFG.realExam; return r && r.pass && r.questions ? r.pass / r.questions : CFG.examPass ? CFG.examPass / CFG.examLength : CFG.passMark; }
+  function hasPass() { return !!((CFG.realExam && CFG.realExam.pass) || CFG.examPass); }
   function needFor(n) { return Math.ceil(passFrac() * n - 1e-9); }
-  function hasTarget() { return !!CFG.examPass && CFG.passMark > passFrac(); }
+  function hasTarget() { return hasPass() && CFG.passMark > passFrac(); }
   function passLine(n, long) {
     return (long ? 'Pass mark ' : 'pass mark ') + needFor(n) + ' of ' + n + ' (' + pct(needFor(n) / n) + ')' + (hasTarget() ? (long ? '. Aim for ' : ' · target ') + pct(CFG.passMark) + (long ? ' before the real exam' : '') : '');
   }
@@ -574,7 +618,7 @@
   // o: { recs: [{ d, s, n, t, u, k }], label(rec), units(rec) -> [{ name, s, n, go }], empty, mockKey }
   var lgSort = 'best';
   function examsView(o) {
-    var recs = o.recs.slice().sort(function (a, b) { return a.d - b.d; });
+    var recs = o.recs.filter(function (x) { return x.n > 0; }).sort(function (a, b) { return a.d - b.d; });
     if (!recs.length) return [h('p', { class: 'hint gap' }, o.empty)];
     var best = 0, last = recs[recs.length - 1]; recs.forEach(function (x) { best = Math.max(best, x.s / x.n); });
     var out = [h('div', { class: 'lgsum' },
@@ -593,7 +637,7 @@
           h('summary', null,
             h('span', { class: 'lgrank' }, lgSort === 'best' ? String(k + 1) : '#' + r.n),
             h('span', { class: 'lgwhen' }, h('b', null, (o.label ? o.label(x) + ' · ' : '') + fmtDate(x.d)), h('small', null, fmtDate(x.d, true).slice(9) + ' · ' + fmtTime(x.t))),
-            h('span', { class: 'lgpct' }, h('b', null, pct(x.s / x.n)), h('small', null, x.s + '/' + x.n)),
+            h('span', { class: 'lgpct' }, h('b', null, x.n ? pct(x.s / x.n) : '–'), h('small', null, x.s + '/' + x.n + (x.adj && x.n0 !== x.n ? ' · ' + (x.n0 - x.n) + ' left out' : '') + (x.old ? ' · all counted' : ''))),
             h('span', { class: 'lgtag ' + g }, GRADE[g])),
           us ? [h('p', { class: 'hint' }, 'Correct answers by unit in this attempt, weakest first.' + (us.some(function (u) { return u.go; }) ? ' Tap Train to practise a unit.' : ''))]
             .concat(us.sort(function (a, b) { return a.s / a.n - b.s / b.n || b.n - a.n; }).map(function (u) {
@@ -601,6 +645,7 @@
               return h('div', { class: 'urow lgu' }, h('div', { class: 'uname' }, u.name, h('b', null, u.s + ' / ' + u.n)), bar(f, f >= CFG.passMark ? 'good' : f < 0.5 ? 'weak' : ''),
                 u.go && f < CFG.passMark ? h('button', { class: 'link lgtrain', type: 'button', onclick: u.go }, 'Train this unit') : null);
             }))
+            : x.old ? h('p', { class: 'hint' }, 'This attempt was sat before the international exam tick, so every question is counted.')
             : h('p', { class: 'hint' }, 'No unit breakdown: this attempt was sat before version 1.7.0.'));
         tbody.appendChild(det);
       });
@@ -733,7 +778,8 @@
       sec('Inside a module: Study and Exams tabs', false, [
         P('The top of a module shows your mastery and how close every unit is to the ' + target + ' target. Below it are two tabs.'),
         UL(['Study: all the practice activities and your progress by unit.',
-          'Exams: the final exam for the module, your progress chart and the league table of every attempt.']),
+          'Exams: the module exam, your progress chart and the league table of every attempt.']),
+        FLT ? P(FLT.label + ': tick this (on a module, on the Results tab or in About) to see your progress and results without those questions. You still practise them, because they matter for your work, but they stop counting towards mastery and scores. Untick it to count everything again.') : null,
         P('The unit chips (All units, ' + (LBL.intro || 'Intro') + ', ' + (LBL.unit || 'Unit') + ' 1 ...) narrow every activity to one unit. Choose a unit when the progress bars or an exam show it is weak.')]),
       sec('Study activities', false, UL([
         'Train me: the best place to start every session. ' + 12 + ' items mixed from flash cards, missing words and questions, weighted towards your weak spots.',
@@ -744,7 +790,7 @@
         'Label the diagram: tap a label, then the number it belongs to.',
         CFG.why ? 'After every checked answer, a Why line explains the answer and where it comes from in the course pack.' : null,
         SAY.ok ? 'The speaker at the top of a question reads it aloud.' : null])),
-      sec('Module final exams', false, [
+      sec('Module exams', false, [
         P(CFG.examLength + ' questions from across the module, in exam conditions: no feedback until you finish, and you can flag questions and go back. ' + passLine(CFG.examLength, true) + '.'),
         P('Each question is worth one mark. A question with several correct answers only scores if you choose every right answer and nothing else.'),
         UL(['When: once every unit is near ' + target + ' on the Study tab. Sitting it too early mostly tells you what you have not learnt yet.',
@@ -760,7 +806,7 @@
         P('Between papers, go back to the modules and use Train me on the units your results show are weak.')]) : null,
       sec('A plan that works', false, UL([
         'Weeks before: work through each module unit by unit' + (anyRead ? ': read the unit, then' : ':') + ' Train me until the unit reaches ' + target + '.',
-        'When a module is at ' + target + ' everywhere, sit its final exam. Fix the weak units it shows, then sit it again.',
+        'When a module is at ' + target + ' everywhere, sit its module exam. Fix the weak units it shows, then sit it again.',
         RV ? 'Final week: start the ' + ND + '-day countdown, one paper a day, with Train me on whatever each paper shows up.' : null,
         RV && MOCKDAY ? 'Day ' + MOCKDAY.n + ': the full mock. You are ready for the real exam when your mocks are at ' + target + ' or above.' : null,
         'Short and often beats long and rare: a little every day keeps more in your memory than one long session a week.'])),
@@ -986,7 +1032,7 @@
       return { m: m, u: t.u, id: t.id, fmt: t.order ? 'seq' : t.a.length > 1 ? 'mr' : 'mc', q: t.q, o: t.o, a: t.a, order: t.order, x: t.x, src: t.src, why: t.why };
     });
     paperRun({
-      title: 'Final exam', paper: paper,
+      title: 'Module exam', paper: paper,
       leave: function () { if (window.confirm('Leave the exam? This attempt will not be saved.')) modScreen(m); },
       head: function (c, body) { if (SRCTAG[c.src]) body.appendChild(h('div', { class: 'utag' }, SRCTAG[c.src])); },
       finish: result
@@ -995,10 +1041,11 @@
       var score = 0, byU = {};
       res.forEach(function (r) { mark(r.c.id, r.ok); if (r.ok) score++; var b = byU[r.c.u] = byU[r.c.u] || { s: 0, n: 0 }; b.n++; if (r.ok) b.s++; });
       var ub = {}; Object.keys(byU).forEach(function (u) { ub[u] = [byU[u].s, byU[u].n]; });
-      (S.exams[m.id] = S.exams[m.id] || []).push({ d: Date.now(), s: score, n: paper.length, t: Math.round((Date.now() - t0) / 1000), u: ub }); save();
+      (S.exams[m.id] = S.exams[m.id] || []).push({ d: Date.now(), s: score, n: paper.length, t: Math.round((Date.now() - t0) / 1000), u: ub,
+        q: res.map(function (r) { return r.c.id; }), k: res.map(function (r) { return r.ok ? '1' : '0'; }).join('') }); save();
       var wrong = res.filter(function (r) { return !r.ok; });
       show(topbar('Exam result', function () { modScreen(m); }),
-        resultHero(score, paper.length, 'Use Train me on the weaker units below.'),
+        resultHero(score, paper.length, 'Use Train me on the weaker units below.'), filterLine(res),
         h('h2', null, 'By unit'),
         Object.keys(byU).map(function (u) { var b = byU[u], f = b.s / b.n; return h('div', { class: 'urow' }, h('div', { class: 'uname' }, m.units[u], h('b', null, b.s + ' / ' + b.n)), bar(f, f >= CFG.passMark ? 'good' : f < 0.5 ? 'weak' : '')); }),
         wrong.length ? h('h2', null, 'Review (' + wrong.length + ')') : null,
@@ -1388,13 +1435,21 @@
     var keys = ['all'].concat(RV.days.filter(function (d) { return hist.some(function (x) { return x.k === d.n; }); }).map(function (d) { return d.n; }))
       .concat(hist.some(function (x) { return x.k === 'mock'; }) ? ['mock'] : []);
     if (keys.indexOf(rvFilter) < 0) rvFilter = 'all';
-    var recs = hist.filter(function (x) { return rvFilter === 'all' || x.k === rvFilter; });
+    var recs = hist.filter(function (x) { return rvFilter === 'all' || x.k === rvFilter; }).map(function (x) {
+      var unitKey = function (id) {
+        var mm = MODS.filter(function (m) { return id.indexOf(m.id + '.') === 0; })[0];
+        if (!mm) return 'rv';
+        var it = mm._items.filter(function (y) { return y.id === id || y.id.indexOf(id + '.') === 0; })[0];
+        return it ? mm.id + '.' + it.u : 'rv';
+      };
+      return adjRec(x.q ? Object.assign({}, x, { k: x.ok, day: x.k }) : x, unitKey);
+    }).map(function (x) { return x.day != null ? Object.assign(x, { k: x.day }) : x; });
     var fs = RV.formats.map(function (f) {
       var x = r.fmt[f[0]];
       return h('div', { class: 'urow' }, h('div', { class: 'uname' }, f[1], h('b', null, x ? x.s + ' / ' + x.n : '–')), bar(x ? x.s / x.n : 0, x ? (x.s / x.n >= CFG.passMark ? 'good' : x.s / x.n < 0.5 ? 'weak' : '') : ''));
     });
     var old = RV.days.concat([{ n: 'mock' }]).filter(function (d) { return r.days[d.n] && !hist.some(function (x) { return x.k === d.n; }); });
-    return [keys.length > 2 ? h('div', { class: 'chips' }, keys.map(function (k) {
+    return [filterTick(rvHome), keys.length > 2 ? h('div', { class: 'chips' }, keys.map(function (k) {
         return h('button', { class: 'chip' + (rvFilter === k ? ' on' : ''), type: 'button', onclick: function () { rvFilter = k; rvHome(); } }, k === 'all' ? 'All papers' : k === 'mock' ? 'Mock' : 'Day ' + k);
       })) : null,
       examsView({ recs: recs, label: function (x) { return x.k === 'mock' ? 'Mock' : 'Day ' + x.k; }, mockKey: true,
@@ -1438,10 +1493,12 @@
     // engine 1.7.0: every attempt is kept for the Results tab (league table and chart)
     var ub = {}; res.forEach(function (x) { var k = rvUnitKey(x.c), b = ub[k] = ub[k] || [0, 0]; b[1]++; if (x.ok) b[0]++; });
     var fb = {}; Object.keys(byF).forEach(function (k) { fb[k] = [byF[k].s, byF[k].n]; });
-    (r.hist = r.hist || []).push({ d: Date.now(), k: key, s: score, n: res.length, t: Math.round((Date.now() - (t0 || Date.now())) / 1000), u: ub, f: fb }); save();
+    (r.hist = r.hist || []).push({ d: Date.now(), k: key, s: score, n: res.length, t: Math.round((Date.now() - (t0 || Date.now())) / 1000), u: ub, f: fb,
+      q: res.map(function (x) { return x.c.id; }), ok: res.map(function (x) { return x.ok ? '1' : '0'; }).join('') }); save();
     var weakest = RV.formats.filter(function (f) { return byF[f[0]]; }).sort(function (a, b) { return byF[a[0]].s / byF[a[0]].n - byF[b[0]].s / byF[b[0]].n; })[0];
     var wrong = res.filter(function (x) { return !x.ok; });
     show(topbar(mock ? 'Mock result' : 'Day ' + day.n + ' result', rvHome),
+      filterLine(res),
       h('div', { class: 'panel hero res' }, h('div', { class: 'big' }, score + ' / ' + res.length), h('div', null, pct(frac) + ' · ' + passLine(res.length)),
         h('div', { class: 'ready ' + (pass ? 'yes' : '') }, gradeText(score, res.length, weakest && byF[weakest[0]].s < byF[weakest[0]].n ? 'Weakest format: ' + weakest[1] + '.' : ''))),
       h('h2', null, 'By exam format'),
